@@ -1,3 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    body {
+        @apply font-sans text-surface-800 antialiased;
+    }
+}
+
+@layer components {
+    /* ─── Gradient Backgrounds ─── */
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #DC2626 0%, #EF4444 50%, #F87171 100%);
+    }
+
+    .bg-gradient-sidebar {
+        background: linear-gradient(180deg, #991B1B 0%, #B91C1C 40%, #DC2626 100%);
+    }
+
+    .bg-gradient-header {
+        background: linear-gradient(90deg, #DC2626 0%, #EF4444 100%);
+    }
+
+    .bg-gradient-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #FEF2F2 100%);
+    }
+
+    /* ─── Card Styles ─── */
+    .card {
+        @apply bg-white rounded-xl shadow-card border border-surface-200/60;
+    }
+
+    .card-hover {
+        @apply card transition-all duration-200 hover:shadow-card-hover hover:border-primary-200;
+    }
+
+    /* ─── Button Styles ─── */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+
+    .btn-primary {
+        @apply btn bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 focus:ring-primary-500 shadow-sm hover:shadow-md active:scale-[0.98];
+    }
+
+    .btn-secondary {
+        @apply btn bg-white text-surface-700 border border-surface-300 hover:bg-surface-50 hover:border-surface-400 focus:ring-primary-500;
+    }
+
+    .btn-danger {
+        @apply btn bg-red-50 text-primary-700 border border-primary-200 hover:bg-primary-100 focus:ring-primary-500;
+    }
+
+    .btn-success {
+        @apply btn bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 focus:ring-emerald-500;
+    }
+
+    .btn-ghost {
+        @apply btn bg-transparent text-surface-600 hover:bg-surface-100 hover:text-surface-800;
+    }
+
+    .btn-icon {
+        @apply inline-flex items-center justify-center p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-700 transition-all duration-200;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+
+    /* ─── Form Inputs ─── */
+    .form-input {
+        @apply w-full rounded-lg border-surface-300 bg-white px-4 py-2.5 text-sm text-surface-800 placeholder-surface-400 shadow-sm transition-all duration-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+    }
+
+    .form-select {
+        @apply form-input pr-10;
+    }
+
+    .form-label {
+        @apply block text-sm font-medium text-surface-700 mb-1.5;
+    }
+
+    /* ─── Table Styles ─── */
+    .table-container {
+        @apply overflow-x-auto rounded-xl border border-surface-200;
+    }
+
+    .table-header {
+        @apply bg-surface-50/80 border-b border-surface-200;
+    }
+
+    .table-header th {
+        @apply px-6 py-3.5 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider;
+    }
+
+    .table-row {
+        @apply border-b border-surface-100 transition-colors duration-150 hover:bg-primary-50/30;
+    }
+
+    .table-row td {
+        @apply px-6 py-4 text-sm text-surface-700 whitespace-nowrap;
+    }
+
+    /* ─── Badge Styles ─── */
+    .badge {
+        @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+    }
+
+    .badge-primary {
+        @apply badge bg-primary-100 text-primary-700;
+    }
+
+    .badge-success {
+        @apply badge bg-emerald-100 text-emerald-700;
+    }
+
+    .badge-warning {
+        @apply badge bg-amber-100 text-amber-700;
+    }
+
+    .badge-danger {
+        @apply badge bg-red-100 text-red-700;
+    }
+
+    .badge-info {
+        @apply badge bg-blue-100 text-blue-700;
+    }
+
+    .badge-neutral {
+        @apply badge bg-surface-100 text-surface-600;
+    }
+
+    /* ─── Animations ─── */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-12px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    .animate-fadeIn {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .animate-slideIn {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    .animate-scaleIn {
+        animation: scaleIn 0.2s ease-out;
+    }
+}

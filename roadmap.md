@@ -51,6 +51,10 @@ AI tidak hanya pasif, tapi bertindak sebagai Agent.
 2.  React Admin menggunakan `window.Echo.private('admin-channel')` untuk mendengarkan.
 3.  **Trigger:** Memunculkan modal popup merah berkedip + memainkan audio sirine (`assets/siren.mp3`).
 
+### **D. Admin Page**
+1.  Admin dapat melakukan CRUD pada tabel.
+2.  Pada setiap halaman CRUD, terdapat sistem soft delete dengan filter dan sidebar
+
 ---
 
 ## 4. Library & Framework List (Dependencies)
@@ -58,7 +62,7 @@ AI tidak hanya pasif, tapi bertindak sebagai Agent.
 ### **Backend (Laravel)**
 *   `laravel/reverb`: High-performance websocket.
 *   `spatie/laravel-permission`: Untuk mengelola role (Admin, Responder, dll).
-*   `google-gemini-php/client`: Untuk integrasi AI.
+*   `groq/groq-php`: Untuk integrasi AI.
 *   `barryvdh/laravel-dompdf`: Untuk laporan Manager.
 
 ### **Frontend (React)**
@@ -75,10 +79,11 @@ AI tidak hanya pasif, tapi bertindak sebagai Agent.
 1.  **Phase 1: Database & Auth**
     *   Setup migrations sesuai skema sebelumnya.
     *   Implementasi Role & Permission.
+    *   Buat halaman CRUD, Untuk manajemen inventory, operational_costs, categories, emergency_units, users, reports, assignments. Tabel tabel yang memang perlu di kelola.
 2.  **Phase 2: Reporting System**
     *   Buat API untuk User mengirim laporan (termasuk upload foto).
 3.  **Phase 3: AI Integration**
-    *   Hubungkan ke Gemini API.
+    *   Hubungkan ke Groq API.
     *   Buat logic "If Category X, then search Youtube Y".
 4.  **Phase 4: Real-time Dispatcher**
     *   Setup Laravel Reverb.
