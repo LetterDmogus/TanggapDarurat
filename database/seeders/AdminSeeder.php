@@ -14,8 +14,7 @@ class AdminSeeder extends Seeder
             [
                 'name' => 'Super Admin',
                 'password' => bcrypt('password'),
-                'role' => 'super_admin',
-                'phone' => '081234567890',
+                'role' => 'superadmin',
             ]
         );
     }

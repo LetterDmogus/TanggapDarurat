@@ -1,94 +1,110 @@
-# 🛡️ Project Specification: AI-Emergency Response System
+# Roadmap Pengembangan Aplikasi Tanggap Darurat
 
-## 1. Project Overview & Tech Stack
-Sistem tanggap darurat yang menghubungkan warga dengan responden terdekat secara real-time, dibantu oleh AI Agent untuk klasifikasi laporan dan panduan bantuan pertama.
+## Status Reset (2026-03-04)
+- Phase 0: `DONE`
+- Phase 1: `DONE` (reset baseline auth + role routing + dashboard skeleton)
+- Phase 2: `DONE`
+- Phase 3+: `PENDING`
 
-### **Backend & Real-time**
-*   **Framework:** Laravel 11 (PHP 8.3)
-*   **Real-time:** Laravel Reverb (Websockets)
+## Arsitektur Inti
+- Backend: Laravel 11 (PHP 8.3)
+- Frontend: React + Inertia + Vite
+- Styling: Tailwind CSS
+- Database model utama: `agencies`, `emergency_types`, `routing_rules`, `locations`, `reports`, `assignments`, `report_photos`, `assignment_photos`
 
-### **Frontend & State Management**
-*   **Framework:** React (Vite)
-*   **Styling:** Tailwind CSS + Shadcn/UI
-*   **State Management:** React Query (TanStack)
+## Role Sistem (standar aktif)
+- `superadmin`
+- `admin`
+- `manager`
+- `instansi`
+- `pelapor`
 
-### **Maps & AI Engine**
-*   **Maps:** Leaflet.js
-*   **AI Engine:** Groq AI API (Structured and Quick Output)
-*   **AI Integration:** Youtube Data API (untuk saran video instruksi)
+## FASE 0 - Finalisasi Arsitektur & Setup
+### Tujuan
+Menyiapkan fondasi project fullstack.
 
----
+### Output
+- Struktur Laravel + Inertia berjalan.
+- Auth dasar (login/register/forgot password) aktif.
 
-## 2. Role & Menu Structure (RBAC)
+## FASE 1 - Core Authentication & Role System
+### Tujuan
+Menjadikan sistem role-based sebagai baseline implementasi.
 
-| Role | Deskripsi | Menu Utama |
-| :--- | :--- | :--- |
-| **User (Warga)** | Pelapor darurat | Panic Button, Active Report Tracking, AI First-Aid Chat, History Laporan, Profil Medis. |
-| **Responder** | Petugas Lapangan | Dashboard Tugas (Incoming), Peta Navigasi, Update Status (Available/Busy), Laporan Selesai. |
-| **Admin** | Dispatcher/Operator | Global Live Map, Validasi Laporan, Assignment Manual, Manajemen User & Responder. |
-| **Manager** | Petinggi/Analyst | Heatmap Bencana, Statistik Performa Responder, Laporan Bulanan (PDF Export), Audit Log. |
+### Yang sudah dikerjakan
+- Legacy backend/page lama diarsipkan ke namespace/folder `Legacy`.
+- Routing aktif dibersihkan hanya untuk:
+  - `/dashboard` (redirect berbasis role)
+  - `/admin/dashboard`
+  - `/instansi/dashboard`
+  - `/pelapor/dashboard`
+  - route auth + profile
+- Database telah diganti ke schema baru sesuai `database.md`.
+- Registrasi default role: `pelapor`.
+- Middleware role disesuaikan dengan role standar roadmap.
+- Dashboard fase 1 disederhanakan (skeleton) untuk `admin`, `instansi`, `pelapor`.
 
----
+### Output Phase 1
+- User login sesuai role.
+- Redirect dashboard sesuai role.
+- Kode lama tidak aktif namun tetap tersimpan untuk reuse.
 
-## 3. Fitur Utama & Alur Kerja (Walkthrough)
+## FASE 2 - Master Data Management (DONE)
+### Backend
+- CRUD `agencies`
+- CRUD `emergency_types`
+- CRUD `locations`
+- CRUD `routing_rules`
+- CRUD `user`
 
-### **A. The AI Agent Brain (The "Emergency Dispatcher")**
-AI tidak hanya pasif, tapi bertindak sebagai Agent.
-1.  **Input:** User mengirim teks/suara ("Ada orang pingsan di jalan").
-2.  **Processing:** Laravel mengirim ke AI Agent dengan prompt khusus untuk:
-    *   Mendeteksi kategori & tingkat urgensi.
-    *   Mencari kata kunci untuk video bantuan (misal: "CPR technique").
-3.  **YouTube Integration:** Backend memanggil YouTube API mencari video resmi dari channel kesehatan terverifikasi.
-4.  **Output:** Chatbot menampilkan teks instruksi + Embed Video YouTube yang relevan secara instan.
+- Implementasi leaflet.js untuk CRUD locations
+- Fitur soft delete untuk setiap data, hanya admin yang bisa lihat isi recycle bin nya
 
-### **B. Geospatial & "Finding Nearest"**
-1.  Sistem mengambil koordinat `lat`, `lng` dari browser user.
-2.  Query database menggunakan **Haversine Formula** untuk mencari `emergency_units` yang `status = available` dalam radius terdekat.
-3.  **Leaflet.js** merender rute (Polyline) antara posisi Responder dan posisi User.
+### Frontend
+- Halaman admin untuk CRUD master data
+- Table + pagination 
+- filter + search bar + order by
+- Halaman CRUD locations ada map preview untuk lihat lokasi yang di pin
 
-### **C. Real-time Siren & Notification**
-1.  Saat laporan masuk, Laravel melempar `broadcast(new EmergencyReported($data))` via Reverb.
-2.  React Admin menggunakan `window.Echo.private('admin-channel')` untuk mendengarkan.
-3.  **Trigger:** Memunculkan modal popup merah berkedip + memainkan audio sirine (`assets/siren.mp3`).
+### Progress (2026-03-04)
+- DONE: CRUD `agencies`
+- DONE: CRUD `emergency_types`
+- DONE: CRUD `locations`
+- DONE: CRUD `routing_rules`
+- DONE: CRUD `user`
+- DONE: Halaman admin CRUD + filter + pagination
+- DONE: Soft delete + recycle bin (superadmin-only) untuk master data
+- DONE: Map preview Leaflet di halaman locations
 
-### **D. Admin Page**
-1.  Admin dapat melakukan CRUD pada tabel.
-2.  Pada setiap halaman CRUD, terdapat sistem soft delete dengan filter dan sidebar
+## FASE 3 - Sistem Pelaporan (Pending)
+### Backend
+- API create report
+- Upload multi-image report
+- Simpan metadata dinamis dan koordinat
 
----
+### Frontend
+- Form laporan dinamis berdasarkan `emergency_type`
+- Map picker (leaflet)
+- Upload multi-image
 
-## 4. Library & Framework List (Dependencies)
+## FASE 4 - Routing & Assignment Engine (Pending)
+### Backend
+- Service routing rule -> assignment instansi
+- Priority handling
+- Status lifecycle assignment
 
-### **Backend (Laravel)**
-*   `laravel/reverb`: High-performance websocket.
-*   `spatie/laravel-permission`: Untuk mengelola role (Admin, Responder, dll).
-*   `groq/groq-php`: Untuk integrasi AI.
-*   `barryvdh/laravel-dompdf`: Untuk laporan Manager.
+## FASE 5 - Dashboard Instansi & Verifikasi (Pending)
+### Backend
+- API assignment list by instansi
+- Update status + upload bukti
 
-### **Frontend (React)**
-*   `leaflet` & `react-leaflet`: Library peta.
-*   `lucide-react`: Icon set.
-*   `shadcn/ui`: Komponen UI premium (Button, Card, Dialog).
-*   `framer-motion`: Untuk animasi sirine dan transisi UI.
-*   `react-speech-recognition`: Untuk fitur Voice-to-Text.
+### Frontend
+- Task list instansi
+- Filter status + detail modal
 
----
-
-## 5. Roadmap Pembuatan (Context for AI Agent)
-
-1.  **Phase 1: Database & Auth**
-    *   Setup migrations sesuai skema sebelumnya.
-    *   Implementasi Role & Permission.
-    *   Buat halaman CRUD, Untuk manajemen inventory, operational_costs, categories, emergency_units, users, reports, assignments. Tabel tabel yang memang perlu di kelola.
-2.  **Phase 2: Reporting System**
-    *   Buat API untuk User mengirim laporan (termasuk upload foto).
-3.  **Phase 3: AI Integration**
-    *   Hubungkan ke Groq API.
-    *   Buat logic "If Category X, then search Youtube Y".
-4.  **Phase 4: Real-time Dispatcher**
-    *   Setup Laravel Reverb.
-    *   Pastikan saat laporan masuk, dashboard Admin berbunyi sirine.
-5.  **Phase 5: Responder App**
-    *   Buat view untuk responder menerima tugas dan melihat navigasi peta.
-6.  **Phase 6: Manager Dashboard**
-    *   Buat grafik (Chart.js) dan heatmap lokasi darurat terbanyak.
+## FASE 6+ (Pending)
+- Real-time update
+- Monitoring manager
+- Superadmin tools
+- Security hardening
+- Deployment dan optimasi

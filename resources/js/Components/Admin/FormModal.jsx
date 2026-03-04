@@ -23,7 +23,7 @@ export default function FormModal({
                     </button>
                 </div>
 
-                <div className="p-6">
+                <div className="p-6 max-h-[80vh] overflow-y-auto">
                     {children}
                 </div>
             </div>

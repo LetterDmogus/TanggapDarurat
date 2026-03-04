@@ -4,7 +4,13 @@ export default function StatusBadge({ type, children, className = '' }) {
             case 'primary':
             case 'admin':
             case 'super_admin':
+            case 'superadmin':
+            case 'manager':
                 return 'badge-primary';
+            case 'instansi':
+                return 'badge-info';
+            case 'pelapor':
+                return 'badge-neutral';
             case 'success':
             case 'resolved':
             case 'available':

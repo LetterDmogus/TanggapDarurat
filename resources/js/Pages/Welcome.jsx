@@ -1,98 +1,204 @@
+import { useEffect, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
+const slides = [
+    {
+        src: '/images/slide-1.jpg',
+        alt: 'Emergency coordination scene one',
+    },
+    {
+        src: '/images/slide-2.jpg',
+        alt: 'Emergency coordination scene two',
+    },
+    {
+        src: '/images/slide-3.jpg',
+        alt: 'Emergency coordination scene three',
+    },
+];
+
+const navItems = [
+    { id: 'about', label: 'About' },
+    { id: 'services', label: 'Services' },
+    { id: 'pricing', label: 'Pricing' },
+    { id: 'contact', label: 'Contact' },
+];
+
 export default function Welcome({ auth }) {
+    const [activeSlide, setActiveSlide] = useState(0);
+
+    useEffect(() => {
+        const slideTimer = setInterval(() => {
+            setActiveSlide((current) => (current + 1) % slides.length);
+        }, 4500);
+
+        return () => clearInterval(slideTimer);
+    }, []);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                    }
+                });
+            },
+            { threshold: 0.22, rootMargin: '0px 0px -10% 0px' },
+        );
+
+        const targets = document.querySelectorAll('.scroll-reveal');
+        targets.forEach((target) => observer.observe(target));
+
+        return () => observer.disconnect();
+    }, []);
+
+    const goTo = (id) => {
+        const section = document.getElementById(id);
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const nextSlide = () => {
+        setActiveSlide((current) => (current + 1) % slides.length);
+    };
+
+    const prevSlide = () => {
+        setActiveSlide((current) => (current - 1 + slides.length) % slides.length);
+    };
+
     return (
         <>
-            <Head title="TanggapDarurat — AI Emergency Response" />
-            <div className="min-h-screen bg-white font-sans selection:bg-primary-500 selection:text-white overflow-hidden relative">
-                {/* Background Decor */}
-                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary-50/50 to-transparent pointer-events-none"></div>
-                <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary-100/30 rounded-full blur-3xl"></div>
+            <Head title="TanggapDarurat - Emergency Response" />
+            <div className="relative overflow-hidden text-white selection:bg-white selection:text-primary-700">
+                <section className="relative min-h-[92vh]">
+                    <div className="absolute inset-0">
+                        {slides.map((slide, index) => (
+                            <div
+                                key={slide.src}
+                                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${
+                                    activeSlide === index ? 'opacity-100' : 'opacity-0'
+                                }`}
+                                style={{ backgroundImage: `url(${slide.src})` }}
+                                role="img"
+                                aria-label={slide.alt}
+                            />
+                        ))}
+                    </div>
 
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
-                    <header className="flex items-center justify-between py-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl flex items-center justify-center shadow-xl shadow-primary-200 text-white font-black text-2xl">
-                                TD
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-black text-surface-900 tracking-tight leading-none uppercase">TanggapDarurat</h1>
-                                <p className="text-[10px] font-bold text-primary-600 tracking-[0.2em] uppercase mt-1">AI Response System</p>
-                            </div>
-                        </div>
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(127,29,29,0.78)_0%,rgba(220,38,38,0.62)_45%,rgba(220,38,38,0.52)_100%)]" />
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(58rem_35rem_at_12%_14%,rgba(255,255,255,0.12),transparent),radial-gradient(50rem_30rem_at_92%_88%,rgba(127,29,29,0.24),transparent)]" />
 
-                        <nav className="flex items-center gap-6">
-                            {auth.user ? (
-                                <Link
-                                    href={route('dashboard')}
-                                    className="btn-primary"
+                    <div className="relative z-10 mx-auto flex min-h-[92vh] max-w-7xl flex-col px-6 pb-16 pt-8 lg:px-8">
+                        <header className="flex items-center justify-between">
+                            <div className="text-3xl font-extrabold tracking-tight">LOGO</div>
+                            <nav className="hidden items-center gap-10 text-base font-semibold text-white/90 lg:flex">
+                                {navItems.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => goTo(item.id)}
+                                        className="border-b border-transparent pb-1 transition hover:border-white hover:text-white"
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </nav>
+                        </header>
+
+                        <main className="mt-16 flex flex-1 items-center">
+                            <section className="scroll-reveal max-w-3xl" style={{ '--reveal-delay': '70ms' }}>
+                                <h1 className="text-5xl font-black leading-[0.98] tracking-tight sm:text-6xl lg:text-7xl">Landing Page</h1>
+                                <p className="mt-6 max-w-xl text-base leading-relaxed text-white/90 lg:text-lg">
+                                    Fast and reliable emergency response platform with AI-supported routing, live operational updates, and coordinated dispatch in one unified system.
+                                </p>
+                                <div className="mt-10 flex flex-wrap items-center gap-4">
+                                    <Link href={auth.user ? route('dashboard') : route('register')} className="rounded-xl bg-[#a21f64] px-8 py-3 text-lg font-bold text-white shadow-lg shadow-red-900/30 transition hover:brightness-110">
+                                        {auth.user ? 'Go to Dashboard' : 'Get Started'}
+                                    </Link>
+                                    {!auth.user && (
+                                        <Link href={route('login')} className="rounded-xl border border-white/50 px-8 py-3 text-lg font-semibold text-white transition hover:bg-white/10">
+                                            Log in
+                                        </Link>
+                                    )}
+                                </div>
+                            </section>
+                        </main>
+
+                        <div className="scroll-reveal flex items-center justify-between rounded-2xl border border-white/25 bg-white/10 px-4 py-3 backdrop-blur" style={{ '--reveal-delay': '140ms' }}>
+                            <div className="flex items-center gap-2">
+                                {slides.map((slide, index) => (
+                                    <button
+                                        type="button"
+                                        key={slide.src + '-dot'}
+                                        onClick={() => setActiveSlide(index)}
+                                        className={`h-2.5 rounded-full transition ${activeSlide === index ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/75'}`}
+                                        aria-label={`Slide ${index + 1}`}
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={prevSlide}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 text-sm font-bold text-white transition hover:bg-white/20"
+                                    aria-label="Previous"
                                 >
-                                    Go to Dashboard
-                                </Link>
-                            ) : (
-                                <>
-                                    <Link
-                                        href={route('login')}
-                                        className="text-sm font-bold text-surface-600 hover:text-primary-600 transition-colors"
-                                    >
-                                        Log in
-                                    </Link>
-                                    <Link
-                                        href={route('register')}
-                                        className="btn-primary px-8"
-                                    >
-                                        Register Now
-                                    </Link>
-                                </>
-                            )}
-                        </nav>
-                    </header>
-
-                    <main className="py-20 lg:py-32 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                        <div className="animate-fadeIn">
-                            <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary-50 text-primary-600 text-xs font-bold mb-6 border border-primary-100">
-                                Phase 1 Initial Release
-                            </div>
-                            <h2 className="text-5xl lg:text-7xl font-black text-surface-900 leading-[1.1] tracking-tight mb-8">
-                                Rapid Response <br />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-primary-500">Enhanced by AI.</span>
-                            </h2>
-                            <p className="text-lg text-surface-500 max-w-lg mb-10 leading-relaxed font-medium">
-                                A cutting-edge emergency management system designed to streamline disaster reporting and optimize unit dispatch using real-time intelligence.
-                            </p>
-                            <div className="flex flex-wrap gap-4">
-                                <Link href={route('register')} className="btn-primary px-10 py-4 text-lg">
-                                    Get Started
-                                </Link>
-                                <button className="btn-secondary px-10 py-4 text-lg border-2">
-                                    System Status
+                                    {'<'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={nextSlide}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 text-sm font-bold text-white transition hover:bg-white/20"
+                                    aria-label="Next"
+                                >
+                                    {'>'}
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </section>
+            </div>
 
-                        <div className="relative animate-scaleIn">
-                            <div className="bg-gradient-to-br from-white to-surface-50 rounded-[2.5rem] border border-surface-200 shadow-2xl p-4 md:p-8 aspect-square flex items-center justify-center overflow-hidden">
-                                <div className="text-center">
-                                    <div className="w-32 h-32 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-lg">
-                                        <svg className="w-16 h-16 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-surface-900 mb-2">Central Command</h3>
-                                    <p className="text-surface-400 font-medium font-bold">System fully operational</p>
-                                </div>
-                                {/* Decorative elements */}
-                                <div className="absolute top-10 right-10 w-20 h-20 bg-emerald-100 rounded-3xl rotate-12 blur-sm opacity-50"></div>
-                                <div className="absolute bottom-10 left-10 w-16 h-16 bg-blue-100 rounded-full -rotate-12 blur-sm opacity-50"></div>
+            <div className="bg-white py-20 text-surface-800 lg:py-24">
+                <div className="mx-auto max-w-7xl space-y-24 px-6 lg:px-8">
+                    <section id="about" className="scroll-reveal rounded-3xl border border-primary-100 bg-gradient-to-br from-primary-50 to-white p-8 lg:p-10" style={{ '--reveal-delay': '60ms' }}>
+                        <h2 className="text-3xl font-black text-primary-700">About</h2>
+                        <p className="mt-4 max-w-3xl text-base leading-relaxed text-surface-600">
+                            Built for emergency command teams, TanggapDarurat centralizes incident intake, prioritization, and agency collaboration with transparent operational visibility.
+                        </p>
+                    </section>
+
+                    <section id="services" className="scroll-reveal rounded-3xl border border-primary-100 bg-white p-8 shadow-sm lg:p-10" style={{ '--reveal-delay': '80ms' }}>
+                        <h2 className="text-3xl font-black text-primary-700">Services</h2>
+                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <div className="rounded-2xl border border-primary-100 bg-primary-50/50 p-5">
+                                <h3 className="text-lg font-bold text-surface-900">Incident Intake</h3>
+                                <p className="mt-2 text-sm text-surface-600">Structured public reporting with location and evidence attachment support.</p>
+                            </div>
+                            <div className="rounded-2xl border border-primary-100 bg-primary-50/50 p-5">
+                                <h3 className="text-lg font-bold text-surface-900">Dispatch Guidance</h3>
+                                <p className="mt-2 text-sm text-surface-600">Priority scoring and route suggestions to accelerate response mobilization.</p>
+                            </div>
+                            <div className="rounded-2xl border border-primary-100 bg-primary-50/50 p-5">
+                                <h3 className="text-lg font-bold text-surface-900">Situation Monitoring</h3>
+                                <p className="mt-2 text-sm text-surface-600">Real-time tracking for field status, updates, and resolution timelines.</p>
                             </div>
                         </div>
-                    </main>
+                    </section>
 
-                    <footer className="py-20 border-t border-surface-100 text-center">
-                        <p className="text-sm font-bold text-surface-400 uppercase tracking-widest">
-                            &copy; {new Date().getFullYear()} TanggapDarurat AI Emergency Response System • Built for Impact
-                        </p>
-                    </footer>
+                    <section id="pricing" className="scroll-reveal rounded-3xl border border-primary-100 bg-gradient-to-br from-white to-primary-50 p-8 lg:p-10" style={{ '--reveal-delay': '100ms' }}>
+                        <h2 className="text-3xl font-black text-primary-700">Pricing</h2>
+                        <p className="mt-4 max-w-2xl text-base text-surface-600">Flexible deployment packages for local agencies, city command centers, and national emergency operations.</p>
+                        <div className="mt-6 inline-flex rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white">
+                            Contact us for institutional quote
+                        </div>
+                    </section>
+
+                    <section id="contact" className="scroll-reveal rounded-3xl border border-primary-100 bg-white p-8 lg:p-10" style={{ '--reveal-delay': '120ms' }}>
+                        <h2 className="text-3xl font-black text-primary-700">Contact</h2>
+                        <p className="mt-4 text-base text-surface-600">Need rollout planning or a live demo for your response team? Reach us at command@tanggapdarurat.id.</p>
+                    </section>
                 </div>
             </div>
         </>

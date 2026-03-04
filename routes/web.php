@@ -1,22 +1,31 @@
 <?php
 
+use App\Http\Controllers\Admin\AgencyController;
+use App\Http\Controllers\Admin\EmergencyTypeController;
+use App\Http\Controllers\Admin\LocationController;
+use App\Http\Controllers\Admin\RoutingRuleController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    return Inertia::render('Welcome');
 });
 
 Route::get('/dashboard', function () {
-    if (in_array(auth()->user()->role, ['admin', 'manager', 'super_admin'])) {
+    $role = auth()->user()->role;
+
+    if (in_array($role, ['superadmin', 'admin', 'manager'], true)) {
         return redirect()->route('admin.dashboard');
+    }
+
+    if ($role === 'instansi') {
+        return redirect()->route('instansi.dashboard');
+    }
+
+    if ($role === 'pelapor') {
+        return redirect()->route('pelapor.dashboard');
     }
 
     return Inertia::render('Dashboard');
@@ -28,36 +37,42 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware(['auth', 'role:admin,manager,super_admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'role:superadmin,admin,manager'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Admin/Dashboard');
     })->name('dashboard');
 
-    // Categories
-    Route::post('categories/{id}/restore', [\App\Http\Controllers\Admin\CategoryController::class, 'restore'])->name('categories.restore');
-    Route::delete('categories/{id}/force-delete', [\App\Http\Controllers\Admin\CategoryController::class, 'forceDelete'])->name('categories.force-delete');
-    Route::resource('categories', \App\Http\Controllers\Admin\CategoryController::class)->except(['create', 'show', 'edit']);
+    Route::resource('agencies', AgencyController::class)->except(['create', 'show', 'edit']);
+    Route::post('agencies/{id}/restore', [AgencyController::class, 'restore'])->name('agencies.restore');
+    Route::delete('agencies/{id}/force-delete', [AgencyController::class, 'forceDelete'])->name('agencies.force-delete');
 
-    // Emergency Units
-    Route::post('emergency-units/{id}/restore', [\App\Http\Controllers\Admin\EmergencyUnitController::class, 'restore'])->name('emergency-units.restore');
-    Route::delete('emergency-units/{id}/force-delete', [\App\Http\Controllers\Admin\EmergencyUnitController::class, 'forceDelete'])->name('emergency-units.force-delete');
-    Route::resource('emergency-units', \App\Http\Controllers\Admin\EmergencyUnitController::class)->except(['create', 'show', 'edit']);
+    Route::resource('emergency-types', EmergencyTypeController::class)->except(['create', 'show', 'edit']);
+    Route::post('emergency-types/{id}/restore', [EmergencyTypeController::class, 'restore'])->name('emergency-types.restore');
+    Route::delete('emergency-types/{id}/force-delete', [EmergencyTypeController::class, 'forceDelete'])->name('emergency-types.force-delete');
 
-    // Users
-    Route::post('users/{id}/restore', [\App\Http\Controllers\Admin\UserController::class, 'restore'])->name('users.restore');
-    Route::delete('users/{id}/force-delete', [\App\Http\Controllers\Admin\UserController::class, 'forceDelete'])->name('users.force-delete');
-    Route::resource('users', \App\Http\Controllers\Admin\UserController::class)->except(['create', 'show', 'edit']);
+    Route::resource('locations', LocationController::class)->except(['create', 'show', 'edit']);
+    Route::post('locations/{id}/restore', [LocationController::class, 'restore'])->name('locations.restore');
+    Route::delete('locations/{id}/force-delete', [LocationController::class, 'forceDelete'])->name('locations.force-delete');
 
-    // Inventory
-    Route::post('inventory/{id}/restore', [\App\Http\Controllers\Admin\InventoryController::class, 'restore'])->name('inventory.restore');
-    Route::delete('inventory/{id}/force-delete', [\App\Http\Controllers\Admin\InventoryController::class, 'forceDelete'])->name('inventory.force-delete');
-    Route::resource('inventory', \App\Http\Controllers\Admin\InventoryController::class)->except(['create', 'show', 'edit']);
+    Route::resource('routing-rules', RoutingRuleController::class)->except(['create', 'show', 'edit']);
+    Route::post('routing-rules/{id}/restore', [RoutingRuleController::class, 'restore'])->name('routing-rules.restore');
+    Route::delete('routing-rules/{id}/force-delete', [RoutingRuleController::class, 'forceDelete'])->name('routing-rules.force-delete');
 
-    // Operational Costs
-    Route::post('operational-costs/{id}/restore', [\App\Http\Controllers\Admin\OperationalCostController::class, 'restore'])->name('operational-costs.restore');
-    Route::delete('operational-costs/{id}/force-delete', [\App\Http\Controllers\Admin\OperationalCostController::class, 'forceDelete'])->name('operational-costs.force-delete');
-    Route::resource('operational-costs', \App\Http\Controllers\Admin\OperationalCostController::class)->except(['create', 'show', 'edit']);
+    Route::post('users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
+    Route::delete('users/{id}/force-delete', [UserController::class, 'forceDelete'])->name('users.force-delete');
+    Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
 });
 
-require __DIR__ . '/auth.php';
+Route::middleware(['auth', 'role:instansi'])->prefix('instansi')->name('instansi.')->group(function () {
+    Route::get('/dashboard', function () {
+        return Inertia::render('Instansi/Dashboard');
+    })->name('dashboard');
+});
 
+Route::middleware(['auth', 'role:pelapor'])->prefix('pelapor')->name('pelapor.')->group(function () {
+    Route::get('/dashboard', function () {
+        return Inertia::render('Pelapor/Dashboard');
+    })->name('dashboard');
+});
+
+require __DIR__.'/auth.php';

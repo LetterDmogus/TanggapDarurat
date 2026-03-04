@@ -11,39 +11,18 @@ class Assignment extends Model
 
     protected $fillable = [
         'report_id',
-        'unit_id',
-        'responder_id',
-        'dispatched_at',
-        'arrived_at',
-        'resolved_at',
+        'agency_id',
+        'status',
+        'description',
+        'admin_verification',
+        'date',
     ];
 
     protected function casts(): array
     {
         return [
-            'dispatched_at' => 'datetime',
-            'arrived_at' => 'datetime',
-            'resolved_at' => 'datetime',
+            'admin_verification' => 'boolean',
+            'date' => 'datetime',
         ];
-    }
-
-    public function report()
-    {
-        return $this->belongsTo(Report::class);
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(EmergencyUnit::class, 'unit_id');
-    }
-
-    public function responder()
-    {
-        return $this->belongsTo(User::class, 'responder_id');
-    }
-
-    public function operationalCosts()
-    {
-        return $this->hasMany(OperationalCost::class);
     }
 }

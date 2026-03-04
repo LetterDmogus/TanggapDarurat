@@ -4,50 +4,28 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Report extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
+        'emergency_type_id',
         'user_id',
-        'description',
-        'category_id',
+        'location_id',
         'status',
-        'urgency_level',
-        'latitude',
+        'description',
         'longitude',
-        'photo_url',
+        'latitude',
+        'metadata',
+        'date',
     ];
 
-    public function user()
+    protected function casts(): array
     {
-        return $this->belongsTo(User::class);
-    }
-
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
-
-    public function aiAnalysis()
-    {
-        return $this->hasOne(AiAnalysis::class);
-    }
-
-    public function assignments()
-    {
-        return $this->hasMany(Assignment::class);
-    }
-
-    public function chatMessages()
-    {
-        return $this->hasMany(ChatMessage::class);
-    }
-
-    public function inventoryMovements()
-    {
-        return $this->hasMany(InventoryMovement::class);
+        return [
+            'metadata' => 'array',
+            'date' => 'datetime',
+        ];
     }
 }

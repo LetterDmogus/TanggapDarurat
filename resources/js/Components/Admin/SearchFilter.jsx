@@ -1,8 +1,8 @@
-import { Search, RotateCcw } from 'lucide-react';
+import { Search, RotateCcw, Trash2 } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 
-export default function SearchFilter({ routeName, filters, extraFilters = [] }) {
+export default function SearchFilter({ routeName, filters, extraFilters = [], includeTrashed = true }) {
     const [search, setSearch] = useState(filters.search || '');
     const [trashed, setTrashed] = useState(filters.trashed || '');
     const [others, setOthers] = useState(
@@ -10,11 +10,12 @@ export default function SearchFilter({ routeName, filters, extraFilters = [] }) 
     );
 
     const prevSearch = useRef(search);
+    const isRecycleBin = trashed === 'true';
 
     const handleFilterChange = (key, value) => {
         const newFilters = { ...others, [key]: value };
         setOthers(newFilters);
-        applyFilters({ ...newFilters, search, trashed });
+        applyFilters({ ...newFilters, search, ...(includeTrashed ? { trashed } : {}) });
     };
 
     const applyFilters = (params) => {
@@ -33,7 +34,7 @@ export default function SearchFilter({ routeName, filters, extraFilters = [] }) 
     useEffect(() => {
         if (prevSearch.current !== search) {
             const timer = setTimeout(() => {
-                applyFilters({ ...others, search, trashed });
+                applyFilters({ ...others, search, ...(includeTrashed ? { trashed } : {}) });
             }, 500);
             prevSearch.current = search;
             return () => clearTimeout(timer);
@@ -70,19 +71,39 @@ export default function SearchFilter({ routeName, filters, extraFilters = [] }) 
                 </div>
             ))}
 
-            <div className="min-w-[140px]">
-                <select
-                    className="form-select h-10 py-0"
-                    value={trashed}
-                    onChange={(e) => {
-                        setTrashed(e.target.value);
-                        applyFilters({ ...others, search, trashed: e.target.value });
-                    }}
-                >
-                    <option value="">Active Items</option>
-                    <option value="true">Recycle Bin</option>
-                </select>
-            </div>
+            {includeTrashed && (
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setTrashed('');
+                            applyFilters({ ...others, search, trashed: '' });
+                        }}
+                        className={`h-10 px-3 rounded-lg border text-sm font-medium transition ${
+                            !isRecycleBin
+                                ? 'bg-primary-50 border-primary-200 text-primary-700'
+                                : 'bg-white border-surface-200 text-surface-600 hover:bg-surface-50'
+                        }`}
+                    >
+                        Active
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setTrashed('true');
+                            applyFilters({ ...others, search, trashed: 'true' });
+                        }}
+                        className={`h-10 px-3 rounded-lg border text-sm font-medium transition flex items-center gap-2 ${
+                            isRecycleBin
+                                ? 'bg-red-50 border-red-200 text-red-700'
+                                : 'bg-white border-surface-200 text-surface-600 hover:bg-surface-50'
+                        }`}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        Recycle Bin
+                    </button>
+                </div>
+            )}
 
             <button
                 onClick={handleReset}

@@ -16,7 +16,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'phone',
+        'agency_id',
     ];
 
     protected $hidden = [
@@ -32,21 +32,14 @@ class User extends Authenticatable
         ];
     }
 
-    // ─── Role Helpers ───
-
     public function isAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'super_admin']);
+        return in_array($this->role, ['admin', 'superadmin'], true);
     }
 
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin';
-    }
-
-    public function isResponder(): bool
-    {
-        return $this->role === 'responder';
+        return $this->role === 'superadmin';
     }
 
     public function isManager(): bool
@@ -54,25 +47,18 @@ class User extends Authenticatable
         return $this->role === 'manager';
     }
 
-    // ─── Relationships ───
-
-    public function reports()
+    public function isInstansi(): bool
     {
-        return $this->hasMany(Report::class);
+        return $this->role === 'instansi';
     }
 
-    public function emergencyUnits()
+    public function isPelapor(): bool
     {
-        return $this->hasMany(EmergencyUnit::class);
+        return $this->role === 'pelapor';
     }
 
-    public function assignments()
+    public function agency()
     {
-        return $this->hasMany(Assignment::class, 'responder_id');
-    }
-
-    public function chatMessages()
-    {
-        return $this->hasMany(ChatMessage::class, 'sender_id');
+        return $this->belongsTo(Agency::class);
     }
 }

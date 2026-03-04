@@ -2,17 +2,15 @@ import { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
-    Tags,
-    Truck,
+    Building2,
+    ShieldAlert,
+    MapPinned,
+    Route as RouteIcon,
     Users,
-    Box,
-    Wallet,
     Menu,
-    X,
     LogOut,
     User as UserIcon,
     ChevronRight,
-    Search,
     Bell
 } from 'lucide-react';
 
@@ -48,11 +46,11 @@ export default function AdminLayout({ header, children }) {
 
     const navigation = [
         { name: 'Dashboard', href: route('admin.dashboard'), icon: LayoutDashboard, active: route().current('admin.dashboard') },
-        { name: 'Categories', href: route('admin.categories.index'), icon: Tags, active: route().current('admin.categories.*') },
-        { name: 'Emergency Units', href: route('admin.emergency-units.index'), icon: Truck, active: route().current('admin.emergency-units.*') },
+        { name: 'Agencies', href: route('admin.agencies.index'), icon: Building2, active: route().current('admin.agencies.*') },
+        { name: 'Emergency Types', href: route('admin.emergency-types.index'), icon: ShieldAlert, active: route().current('admin.emergency-types.*') },
+        { name: 'Locations', href: route('admin.locations.index'), icon: MapPinned, active: route().current('admin.locations.*') },
+        { name: 'Routing Rules', href: route('admin.routing-rules.index'), icon: RouteIcon, active: route().current('admin.routing-rules.*') },
         { name: 'Users', href: route('admin.users.index'), icon: Users, active: route().current('admin.users.*') },
-        { name: 'Inventory', href: route('admin.inventory.index'), icon: Box, active: route().current('admin.inventory.*') },
-        { name: 'Operational Costs', href: route('admin.operational-costs.index'), icon: Wallet, active: route().current('admin.operational-costs.*') },
     ];
 
     return (
