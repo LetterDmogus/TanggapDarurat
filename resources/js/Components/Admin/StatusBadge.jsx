@@ -17,16 +17,19 @@ export default function StatusBadge({ type, children, className = '' }) {
                 return 'badge-success';
             case 'warning':
             case 'pending':
+            case 'submitted':
             case 'on_site':
             case 'busy':
                 return 'badge-warning';
             case 'danger':
+            case 'rejected':
             case 'fake':
             case 'critical':
             case 'high':
                 return 'badge-danger';
             case 'info':
             case 'assigned':
+            case 'in_progress':
             case 'low':
                 return 'badge-info';
             default:

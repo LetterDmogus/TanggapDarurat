@@ -7,6 +7,7 @@ import {
     MapPinned,
     Route as RouteIcon,
     Users,
+    ClipboardList,
     Menu,
     LogOut,
     User as UserIcon,
@@ -51,6 +52,7 @@ export default function AdminLayout({ header, children }) {
         { name: 'Locations', href: route('admin.locations.index'), icon: MapPinned, active: route().current('admin.locations.*') },
         { name: 'Routing Rules', href: route('admin.routing-rules.index'), icon: RouteIcon, active: route().current('admin.routing-rules.*') },
         { name: 'Users', href: route('admin.users.index'), icon: Users, active: route().current('admin.users.*') },
+        { name: 'Reports', href: route('admin.reports.index'), icon: ClipboardList, active: route().current('admin.reports.*') },
     ];
 
     return (

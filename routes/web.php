@@ -3,8 +3,10 @@
 use App\Http\Controllers\Admin\AgencyController;
 use App\Http\Controllers\Admin\EmergencyTypeController;
 use App\Http\Controllers\Admin\LocationController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\RoutingRuleController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Pelapor\ReportController as PelaporReportController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -61,6 +63,7 @@ Route::middleware(['auth', 'role:superadmin,admin,manager'])->prefix('admin')->n
     Route::post('users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
     Route::delete('users/{id}/force-delete', [UserController::class, 'forceDelete'])->name('users.force-delete');
     Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
+    Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');
 });
 
 Route::middleware(['auth', 'role:instansi'])->prefix('instansi')->name('instansi.')->group(function () {
@@ -73,6 +76,11 @@ Route::middleware(['auth', 'role:pelapor'])->prefix('pelapor')->name('pelapor.')
     Route::get('/dashboard', function () {
         return Inertia::render('Pelapor/Dashboard');
     })->name('dashboard');
+
+    Route::get('/reports', [PelaporReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/create', [PelaporReportController::class, 'create'])->name('reports.create');
+    Route::post('/reports', [PelaporReportController::class, 'store'])->name('reports.store');
+    Route::get('/reports/{report}', [PelaporReportController::class, 'show'])->name('reports.show');
 });
 
 require __DIR__.'/auth.php';

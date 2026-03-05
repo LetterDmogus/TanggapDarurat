@@ -3,15 +3,26 @@ import { Link } from '@inertiajs/react';
 
 export default function GuestLayout({ children }) {
     return (
-        <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0">
-            <div>
-                <Link href="/">
-                    <ApplicationLogo className="h-20 w-20 fill-current text-gray-500" />
-                </Link>
-            </div>
+        <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-red-50 via-white to-red-100 px-4 py-8">
+            <div className="pointer-events-none absolute -left-28 -top-24 h-72 w-72 rounded-full bg-red-200/55 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-red-300/45 blur-3xl" />
 
-            <div className="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg">
-                {children}
+            <div className="relative w-full max-w-md">
+                <div className="mb-6 text-center">
+                    <Link href="/" className="inline-flex items-center gap-3">
+                        <div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-500 p-2.5 shadow-lg shadow-red-300/60">
+                            <ApplicationLogo className="h-10 w-10 fill-current text-white" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-lg font-extrabold tracking-tight text-surface-900">TanggapDarurat</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-700">Emergency Platform</p>
+                        </div>
+                    </Link>
+                </div>
+
+                <div className="w-full overflow-hidden rounded-2xl border border-red-100 bg-white px-7 py-8 shadow-[0_20px_45px_-25px_rgba(127,29,29,0.45)]">
+                    {children}
+                </div>
             </div>
         </div>
     );

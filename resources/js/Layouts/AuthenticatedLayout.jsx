@@ -30,6 +30,14 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     Dashboard
                                 </NavLink>
+                                {user.role === 'pelapor' && (
+                                    <NavLink
+                                        href={route('pelapor.reports.index')}
+                                        active={route().current('pelapor.reports.*')}
+                                    >
+                                        Laporan
+                                    </NavLink>
+                                )}
                             </div>
                         </div>
 
@@ -134,6 +142,14 @@ export default function AuthenticatedLayout({ header, children }) {
                         >
                             Dashboard
                         </ResponsiveNavLink>
+                        {user.role === 'pelapor' && (
+                            <ResponsiveNavLink
+                                href={route('pelapor.reports.index')}
+                                active={route().current('pelapor.reports.*')}
+                            >
+                                Laporan
+                            </ResponsiveNavLink>
+                        )}
                     </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">
