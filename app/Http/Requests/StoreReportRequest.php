@@ -4,11 +4,12 @@ namespace App\Http\Requests;
 
 use App\Models\EmergencyType;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreReportRequest extends FormRequest
 {
+    public const OTHER_EMERGENCY_VALUE = 'others';
+
     private array $parsedMetadata = [];
 
     public function authorize(): bool
@@ -19,11 +20,8 @@ class StoreReportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'emergency_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('emergency_types', 'id')->whereNull('deleted_at'),
-            ],
+            'emergency_type_id' => ['required'],
+            'other_emergency_title' => ['nullable', 'string', 'min:3', 'max:120'],
             'description' => ['required', 'string', 'min:10', 'max:5000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
@@ -36,6 +34,21 @@ class StoreReportRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if ($this->isOtherEmergencySelection()) {
+                if (!$this->filled('other_emergency_title')) {
+                    $validator->errors()->add('other_emergency_title', 'Judul emergency lainnya wajib diisi.');
+                }
+                $this->parsedMetadata = [];
+
+                return;
+            }
+
+            if (!$this->isKnownEmergencyTypeSelection()) {
+                $validator->errors()->add('emergency_type_id', 'Jenis emergency tidak valid.');
+
+                return;
+            }
+
             $emergencyType = EmergencyType::query()->find($this->integer('emergency_type_id'));
 
             if (!$emergencyType) {
@@ -49,6 +62,11 @@ class StoreReportRequest extends FormRequest
 
             $this->validateAndParseMetadata($validator, $emergencyType);
         });
+    }
+
+    public function isOtherEmergencySelection(): bool
+    {
+        return (string) $this->input('emergency_type_id') === self::OTHER_EMERGENCY_VALUE;
     }
 
     public function parsedMetadata(): array
@@ -110,6 +128,19 @@ class StoreReportRequest extends FormRequest
         }
 
         $this->parsedMetadata = $decoded;
+    }
+
+    private function isKnownEmergencyTypeSelection(): bool
+    {
+        $value = $this->input('emergency_type_id');
+        if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+            return EmergencyType::query()
+                ->whereKey((int) $value)
+                ->whereNull('deleted_at')
+                ->exists();
+        }
+
+        return false;
     }
 
     private function isValueValidByType(mixed $value, string $type, array $field): bool

@@ -6,11 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Location;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class LocationController extends Controller
 {
+    private function assertRecycleBinAccess(Request $request): void
+    {
+        if (!$this->canViewRecycleBin($request)) {
+            abort(403, 'Only superadmin can access recycle bin.');
+        }
+    }
+
     private function canViewRecycleBin(Request $request): bool
     {
         return $request->user()?->isSuperAdmin() ?? false;
@@ -18,6 +26,7 @@ class LocationController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = max(1, min(100, $request->integer('per_page', 10)));
         $query = Location::with('agency');
 
         if ($request->filled('search')) {
@@ -35,15 +44,13 @@ class LocationController extends Controller
         $canViewRecycleBin = $this->canViewRecycleBin($request);
 
         if ($request->trashed === 'true') {
-            if (!$canViewRecycleBin) {
-                abort(403, 'Only admin or superadmin can access recycle bin.');
-            }
+            $this->assertRecycleBinAccess($request);
             $query->onlyTrashed();
         }
 
         return Inertia::render('Admin/Locations/Index', [
-            'items' => $query->latest()->paginate(10)->withQueryString(),
-            'filters' => $request->only(['search', 'agency_id', 'trashed']),
+            'items' => $query->latest()->paginate($perPage)->withQueryString(),
+            'filters' => $request->only(['search', 'agency_id', 'trashed', 'per_page']),
             'agencies' => Agency::orderBy('name')->get(['id', 'name']),
             'canViewRecycleBin' => $canViewRecycleBin,
         ]);
@@ -68,6 +75,7 @@ class LocationController extends Controller
             'agency_id' => $validated['agency_id'] ?? null,
             'metadata' => $this->decodeJsonNullable($validated['metadata_text'] ?? null, 'metadata_text'),
         ]);
+        Cache::forget('pelapor:locations:create');
 
         return back()->with('success', 'Location created successfully.');
     }
@@ -91,6 +99,7 @@ class LocationController extends Controller
             'agency_id' => $validated['agency_id'] ?? null,
             'metadata' => $this->decodeJsonNullable($validated['metadata_text'] ?? null, 'metadata_text'),
         ]);
+        Cache::forget('pelapor:locations:create');
 
         return back()->with('success', 'Location updated successfully.');
     }
@@ -98,20 +107,25 @@ class LocationController extends Controller
     public function destroy(Location $location)
     {
         $location->delete();
+        Cache::forget('pelapor:locations:create');
 
         return back()->with('success', 'Location moved to recycle bin.');
     }
 
-    public function restore(int $id)
+    public function restore(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         Location::withTrashed()->findOrFail($id)->restore();
+        Cache::forget('pelapor:locations:create');
 
         return back()->with('success', 'Location restored successfully.');
     }
 
-    public function forceDelete(int $id)
+    public function forceDelete(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         Location::withTrashed()->findOrFail($id)->forceDelete();
+        Cache::forget('pelapor:locations:create');
 
         return back()->with('success', 'Location permanently deleted.');
     }

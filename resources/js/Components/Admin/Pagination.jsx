@@ -2,23 +2,29 @@ import { Link } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Pagination({ links }) {
-    if (links.length <= 3) return null;
+    const safeLinks = Array.isArray(links) ? links : [];
+    if (safeLinks.length <= 3) return null;
+
+    const previous = safeLinks[0];
+    const next = safeLinks[safeLinks.length - 1];
 
     return (
         <div className="flex items-center justify-between px-4 py-3 bg-white border border-surface-200 rounded-xl sm:px-6 shadow-sm mt-6">
             <div className="flex justify-between flex-1 sm:hidden">
-                <Link
-                    href={links[0].url}
-                    className="btn-secondary btn-sm"
-                >
-                    Previous
-                </Link>
-                <Link
-                    href={links[links.length - 1].url}
-                    className="btn-secondary btn-sm"
-                >
-                    Next
-                </Link>
+                {previous?.url ? (
+                    <Link href={previous.url} className="btn-secondary btn-sm">
+                        Previous
+                    </Link>
+                ) : (
+                    <span className="btn-secondary btn-sm opacity-50 cursor-not-allowed">Previous</span>
+                )}
+                {next?.url ? (
+                    <Link href={next.url} className="btn-secondary btn-sm">
+                        Next
+                    </Link>
+                ) : (
+                    <span className="btn-secondary btn-sm opacity-50 cursor-not-allowed">Next</span>
+                )}
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                 <div>
@@ -26,7 +32,7 @@ export default function Pagination({ links }) {
                 </div>
                 <div>
                     <nav className="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px" aria-label="Pagination">
-                        {links.map((link, key) => {
+                        {safeLinks.map((link, key) => {
                             if (link.url === null) {
                                 return (
                                     <span

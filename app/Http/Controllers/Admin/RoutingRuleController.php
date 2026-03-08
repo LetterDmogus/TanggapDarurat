@@ -5,12 +5,21 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\EmergencyType;
+use App\Models\Report;
 use App\Models\RoutingRule;
+use App\Services\RoutingAssignmentEngine;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class RoutingRuleController extends Controller
 {
+    private function assertRecycleBinAccess(Request $request): void
+    {
+        if (!$this->canViewRecycleBin($request)) {
+            abort(403, 'Only superadmin can access recycle bin.');
+        }
+    }
+
     private function canViewRecycleBin(Request $request): bool
     {
         return $request->user()?->isSuperAdmin() ?? false;
@@ -18,6 +27,7 @@ class RoutingRuleController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = max(1, min(100, $request->integer('per_page', 10)));
         $query = RoutingRule::with(['emergencyType', 'agency']);
 
         if ($request->filled('emergency_type_id')) {
@@ -45,22 +55,20 @@ class RoutingRuleController extends Controller
         $canViewRecycleBin = $this->canViewRecycleBin($request);
 
         if ($request->trashed === 'true') {
-            if (!$canViewRecycleBin) {
-                abort(403, 'Only admin or superadmin can access recycle bin.');
-            }
+            $this->assertRecycleBinAccess($request);
             $query->onlyTrashed();
         }
 
         return Inertia::render('Admin/RoutingRules/Index', [
-            'items' => $query->latest()->paginate(10)->withQueryString(),
-            'filters' => $request->only(['search', 'emergency_type_id', 'agency_id', 'trashed']),
+            'items' => $query->latest()->paginate($perPage)->withQueryString(),
+            'filters' => $request->only(['search', 'emergency_type_id', 'agency_id', 'trashed', 'per_page']),
             'emergencyTypes' => EmergencyType::orderBy('name')->get(['id', 'name', 'display_name']),
             'agencies' => Agency::orderBy('name')->get(['id', 'name']),
             'canViewRecycleBin' => $canViewRecycleBin,
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, RoutingAssignmentEngine $routingEngine)
     {
         $validated = $request->validate([
             'emergency_type_id' => 'required|exists:emergency_types,id',
@@ -71,11 +79,12 @@ class RoutingRuleController extends Controller
         ]);
 
         RoutingRule::create($validated);
+        $this->backfillAssignmentsForEmergencyType((int) $validated['emergency_type_id'], $routingEngine);
 
         return back()->with('success', 'Routing rule created successfully.');
     }
 
-    public function update(Request $request, RoutingRule $routingRule)
+    public function update(Request $request, RoutingRule $routingRule, RoutingAssignmentEngine $routingEngine)
     {
         $validated = $request->validate([
             'emergency_type_id' => 'required|exists:emergency_types,id',
@@ -86,6 +95,7 @@ class RoutingRuleController extends Controller
         ]);
 
         $routingRule->update($validated);
+        $this->backfillAssignmentsForEmergencyType((int) $validated['emergency_type_id'], $routingEngine);
 
         return back()->with('success', 'Routing rule updated successfully.');
     }
@@ -97,17 +107,33 @@ class RoutingRuleController extends Controller
         return back()->with('success', 'Routing rule moved to recycle bin.');
     }
 
-    public function restore(int $id)
+    public function restore(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         RoutingRule::withTrashed()->findOrFail($id)->restore();
 
         return back()->with('success', 'Routing rule restored successfully.');
     }
 
-    public function forceDelete(int $id)
+    public function forceDelete(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         RoutingRule::withTrashed()->findOrFail($id)->forceDelete();
 
         return back()->with('success', 'Routing rule permanently deleted.');
+    }
+
+    private function backfillAssignmentsForEmergencyType(int $emergencyTypeId, RoutingAssignmentEngine $routingEngine): void
+    {
+        Report::query()
+            ->where('emergency_type_id', $emergencyTypeId)
+            ->where('status', 'submitted')
+            ->whereDoesntHave('assignments')
+            ->orderBy('id')
+            ->chunkById(100, function ($reports) use ($routingEngine): void {
+                foreach ($reports as $report) {
+                    $routingEngine->routeReport($report);
+                }
+            });
     }
 }

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 class AdminSeeder extends Seeder
 {
@@ -15,6 +16,7 @@ class AdminSeeder extends Seeder
                 'name' => 'Super Admin',
                 'password' => bcrypt('password'),
                 'role' => 'superadmin',
+                'email_verified_at' => Carbon::now(),
             ]
         );
     }

@@ -2,22 +2,45 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import { getRecaptchaV3Token, preloadRecaptchaV3 } from '@/Utils/recaptchaV3';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useEffect } from 'react';
 
 export default function Register() {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset, transform, setError, clearErrors } = useForm({
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
+        recaptcha_token: '',
     });
+    const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
-    const submit = (e) => {
+    useEffect(() => {
+        preloadRecaptchaV3(recaptchaSiteKey);
+    }, [recaptchaSiteKey]);
+
+    const submit = async (e) => {
         e.preventDefault();
 
+        clearErrors('recaptcha_token');
+        const token = await getRecaptchaV3Token(recaptchaSiteKey, 'register');
+        if (!token) {
+            setError('recaptcha_token', 'Gagal memproses reCAPTCHA. Silakan muat ulang halaman.');
+            return;
+        }
+
+        transform((form) => ({
+            ...form,
+            recaptcha_token: token,
+        }));
+
         post(route('register'), {
-            onFinish: () => reset('password', 'password_confirmation'),
+            onFinish: () => {
+                reset('password', 'password_confirmation', 'recaptcha_token');
+                transform((form) => form);
+            },
         });
     };
 
@@ -106,6 +129,9 @@ export default function Register() {
                         className="mt-2"
                     />
                 </div>
+
+                <input type="hidden" name="recaptcha_token" value={data.recaptcha_token} />
+                <InputError message={errors.recaptcha_token} className="mt-2" />
 
                 <div className="mt-4 flex items-center justify-end">
                     <Link

@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
+    const hasEmergencyThemeHeader = ['pelapor', 'instansi'].includes(user?.role);
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
@@ -19,7 +20,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         <div className="flex">
                             <div className="flex shrink-0 items-center">
                                 <Link href="/">
-                                    <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800" />
+                                    <ApplicationLogo className="block h-9 w-auto object-contain" />
                                 </Link>
                             </div>
 
@@ -179,9 +180,15 @@ export default function AuthenticatedLayout({ header, children }) {
             </nav>
 
             {header && (
-                <header className="bg-white shadow">
+                <header className={hasEmergencyThemeHeader ? 'bg-gradient-to-r from-red-700 via-red-600 to-red-700 shadow' : 'bg-white shadow'}>
                     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                        {header}
+                        {hasEmergencyThemeHeader ? (
+                            <div className="rounded-xl border border-white/80 px-4 py-3 text-white">
+                                {header}
+                            </div>
+                        ) : (
+                            header
+                        )}
                     </div>
                 </header>
             )}

@@ -16,7 +16,11 @@ class Report extends Model
         'user_id',
         'location_id',
         'status',
+        'is_other_emergency',
         'description',
+        'other_emergency_title',
+        'triaged_by',
+        'triaged_at',
         'longitude',
         'latitude',
         'metadata',
@@ -27,9 +31,11 @@ class Report extends Model
     protected function casts(): array
     {
         return [
+            'is_other_emergency' => 'boolean',
             'metadata' => 'array',
             'metadata_schema_version' => 'integer',
             'date' => 'datetime',
+            'triaged_at' => 'datetime',
         ];
     }
 
@@ -56,5 +62,10 @@ class Report extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
+    }
+
+    public function steps(): HasMany
+    {
+        return $this->hasMany(Step::class);
     }
 }

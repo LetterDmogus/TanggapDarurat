@@ -3,8 +3,8 @@ import DataTable from '@/Components/Admin/DataTable';
 import Pagination from '@/Components/Admin/Pagination';
 import SearchFilter from '@/Components/Admin/SearchFilter';
 import StatusBadge from '@/Components/Admin/StatusBadge';
-import { Head } from '@inertiajs/react';
-import { ClipboardList } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { ClipboardList, Eye } from 'lucide-react';
 
 export default function Index({ items, filters, statuses }) {
     const columns = [
@@ -45,7 +45,19 @@ export default function Index({ items, filters, statuses }) {
                 ]}
             />
 
-            <DataTable columns={columns} items={items.data} />
+            <DataTable
+                columns={columns}
+                items={items.data}
+                actions={(item) => (
+                    <Link
+                        href={route('admin.reports.show', item.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                    >
+                        <Eye className="h-3.5 w-3.5" />
+                        Detail
+                    </Link>
+                )}
+            />
             <Pagination links={items.links} />
         </AdminLayout>
     );

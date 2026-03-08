@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'recaptcha' => [
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+        'min_score' => env('RECAPTCHA_MIN_SCORE', 0.5),
+        'strict' => env('RECAPTCHA_STRICT', false),
+    ],
+
+    'discord' => [
+        'activity_webhook_url' => env('DISCORD_ACTIVITY_WEBHOOK_URL'),
+        'activity_verify_ssl' => env('DISCORD_ACTIVITY_VERIFY_SSL', true),
+    ],
+
 ];

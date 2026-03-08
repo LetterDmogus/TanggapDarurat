@@ -4,6 +4,8 @@ import Toast from '@/Components/Admin/Toast';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
+const OTHER_EMERGENCY_VALUE = 'others';
+
 function normalizeSchema(formSchema) {
     const fields = Array.isArray(formSchema?.fields) ? formSchema.fields : [];
 
@@ -17,12 +19,13 @@ function normalizeSchema(formSchema) {
         .filter((field) => field.name && field.title);
 }
 
-export default function Create({ emergencyTypes }) {
+export default function Create({ emergencyTypes, locations = [] }) {
     const [metadataFields, setMetadataFields] = useState([]);
     const [metadataValues, setMetadataValues] = useState({});
 
     const { data, setData, post, processing, errors } = useForm({
         emergency_type_id: '',
+        other_emergency_title: '',
         description: '',
         latitude: '',
         longitude: '',
@@ -34,6 +37,23 @@ export default function Create({ emergencyTypes }) {
         return emergencyTypes.find((item) => String(item.id) === String(data.emergency_type_id)) ?? null;
     }, [emergencyTypes, data.emergency_type_id]);
 
+    const isOtherEmergency = String(data.emergency_type_id) === OTHER_EMERGENCY_VALUE;
+
+    const locationPins = useMemo(
+        () =>
+            locations
+                .map((location) => ({
+                    id: location.id,
+                    name: location.name,
+                    location_type: location.location_type,
+                    latitude: Number(location.latitude),
+                    longitude: Number(location.longitude),
+                    agency: location.agency,
+                }))
+                .filter((location) => !Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)),
+        [locations],
+    );
+
     const previews = useMemo(
         () => data.photos.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
         [data.photos],
@@ -41,6 +61,16 @@ export default function Create({ emergencyTypes }) {
 
     const onEmergencyTypeChange = (value) => {
         setData('emergency_type_id', value);
+
+        if (String(value) === OTHER_EMERGENCY_VALUE) {
+            setMetadataFields([]);
+            setMetadataValues({});
+            setData('metadata_text', JSON.stringify({}));
+            setData('latitude', '');
+            setData('longitude', '');
+            return;
+        }
+
         const selected = emergencyTypes.find((item) => String(item.id) === String(value));
         const fields = normalizeSchema(selected?.form_schema);
         setMetadataFields(fields);
@@ -83,33 +113,75 @@ export default function Create({ emergencyTypes }) {
         <AuthenticatedLayout
             header={
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Buat Laporan Darurat</h2>
-                    <Link href={route('pelapor.reports.index')} className="btn-secondary">Daftar Laporan</Link>
+                    <h2 className="text-xl font-semibold leading-tight text-white">Buat Laporan Darurat</h2>
+                    <Link
+                        href={route('pelapor.reports.index')}
+                        className="inline-flex items-center rounded-xl border border-white px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                    >
+                        Daftar Laporan
+                    </Link>
                 </div>
             }
         >
             <Head title="Buat Laporan" />
 
-            <div className="py-8">
+            <div className="min-h-[calc(100vh-9rem)] w-full bg-gradient-to-b from-red-700 via-red-600 to-red-700 py-8">
                 <div className="mx-auto max-w-5xl sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg border border-surface-200">
                         <form onSubmit={submit} className="p-6 space-y-6">
                             <div>
                                 <label className="form-label">Tipe Darurat</label>
-                                <select
-                                    className="form-select"
-                                    value={data.emergency_type_id}
-                                    onChange={(event) => onEmergencyTypeChange(event.target.value)}
-                                >
-                                    <option value="">Pilih tipe darurat</option>
-                                    {emergencyTypes.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.display_name || item.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {emergencyTypes.map((item) => {
+                                        const itemId = String(item.id);
+                                        const isActive = String(data.emergency_type_id) === itemId;
+
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => onEmergencyTypeChange(itemId)}
+                                                className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+                                                    isActive
+                                                        ? 'bg-red-50 border-red-300 text-red-700'
+                                                        : 'bg-white border-surface-300 text-surface-700 hover:bg-surface-50'
+                                                }`}
+                                                aria-pressed={isActive}
+                                            >
+                                                {item.display_name || item.name}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => onEmergencyTypeChange(OTHER_EMERGENCY_VALUE)}
+                                        className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+                                            isOtherEmergency
+                                                ? 'bg-red-50 border-red-300 text-red-700'
+                                                : 'bg-white border-surface-300 text-surface-700 hover:bg-surface-50'
+                                        }`}
+                                        aria-pressed={isOtherEmergency}
+                                    >
+                                        Lainnya
+                                    </button>
+                                </div>
+                                <p className="text-xs text-surface-500 mt-2">Pilih salah satu jenis emergency.</p>
                                 {errors.emergency_type_id && <p className="text-xs text-red-500 mt-1">{errors.emergency_type_id}</p>}
                             </div>
+
+                            {isOtherEmergency && (
+                                <div>
+                                    <label className="form-label">Judul Emergency Lainnya</label>
+                                    <input
+                                        className="form-input"
+                                        value={data.other_emergency_title}
+                                        onChange={(event) => setData('other_emergency_title', event.target.value)}
+                                        placeholder="Contoh: Kerusakan jaringan skala kota"
+                                    />
+                                    <p className="text-xs text-surface-500 mt-1">Admin akan klasifikasikan ke tipe resmi atau membuat tipe baru.</p>
+                                    {errors.other_emergency_title && <p className="text-xs text-red-500 mt-1">{errors.other_emergency_title}</p>}
+                                </div>
+                            )}
 
                             {selectedEmergencyType && (
                                 <div className="p-4 rounded-lg bg-surface-50 border border-surface-200">
@@ -183,7 +255,9 @@ export default function Create({ emergencyTypes }) {
                                         lat={data.latitude ? Number(data.latitude) : null}
                                         lng={data.longitude ? Number(data.longitude) : null}
                                         onChange={onMapChange}
+                                        markers={locationPins}
                                     />
+                                    <p className="text-xs text-surface-500">Pin merah menunjukkan titik lokasi/area agency dari data tabel lokasi.</p>
                                     <div className="grid md:grid-cols-2 gap-3">
                                         <div>
                                             <label className="form-label">Latitude</label>

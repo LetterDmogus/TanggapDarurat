@@ -12,16 +12,21 @@ export default function Index({ items, filters, statuses }) {
         <AuthenticatedLayout
             header={
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Laporan Saya</h2>
-                    <Link href={route('pelapor.reports.create')} className="btn-primary">Buat Laporan</Link>
+                    <h2 className="text-xl font-bold leading-tight text-white">Laporan Saya</h2>
+                    <Link
+                        href={route('pelapor.reports.create')}
+                        className="inline-flex items-center rounded-xl border border-white px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                    >
+                        Buat Laporan
+                    </Link>
                 </div>
             }
         >
             <Head title="Laporan Saya" />
 
-            <div className="py-8">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8 space-y-4">
-                    <div className="card p-4 grid md:grid-cols-4 gap-3">
+            <div className="min-h-[calc(100vh-9rem)] w-full bg-gradient-to-b from-red-700 via-red-600 to-red-700 py-8">
+                <div className="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
+                    <div className="grid gap-3 rounded-2xl border border-red-100 bg-white p-4 shadow md:grid-cols-4">
                         <div>
                             <label className="form-label">Status</label>
                             <select
@@ -60,7 +65,7 @@ export default function Index({ items, filters, statuses }) {
                         </div>
                     </div>
 
-                    <div className="card overflow-hidden">
+                    <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow">
                         <div className="table-container bg-white">
                             <table className="w-full min-w-full">
                                 <thead className="table-header">

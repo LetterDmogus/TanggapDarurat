@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Services\RecaptchaVerifier;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,21 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            'recaptcha_token' => [
+                'required',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $verified = app(RecaptchaVerifier::class)->verify(
+                        is_string($value) ? $value : null,
+                        $this->ip(),
+                        'login',
+                    );
+
+                    if (!$verified) {
+                        $fail('Verifikasi reCAPTCHA gagal. Silakan coba lagi.');
+                    }
+                },
+            ],
         ];
     }
 
@@ -46,6 +62,16 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ]);
+        }
+
+        $user = Auth::user();
+        if (!$user?->hasVerifiedEmail()) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Email belum diverifikasi. Cek inbox Anda lalu klik tautan verifikasi.',
             ]);
         }
 

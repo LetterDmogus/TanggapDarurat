@@ -3,21 +3,44 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import { getRecaptchaV3Token, preloadRecaptchaV3 } from '@/Utils/recaptchaV3';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useEffect } from 'react';
 
 export default function Login({ status, canResetPassword }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset, transform, setError, clearErrors } = useForm({
         email: '',
         password: '',
         remember: false,
+        recaptcha_token: '',
     });
+    const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
-    const submit = (e) => {
+    useEffect(() => {
+        preloadRecaptchaV3(recaptchaSiteKey);
+    }, [recaptchaSiteKey]);
+
+    const submit = async (e) => {
         e.preventDefault();
 
+        clearErrors('recaptcha_token');
+        const token = await getRecaptchaV3Token(recaptchaSiteKey, 'login');
+        if (!token) {
+            setError('recaptcha_token', 'Gagal memproses reCAPTCHA. Silakan muat ulang halaman.');
+            return;
+        }
+
+        transform((form) => ({
+            ...form,
+            recaptcha_token: token,
+        }));
+
         post(route('login'), {
-            onFinish: () => reset('password'),
+            onFinish: () => {
+                reset('password', 'recaptcha_token');
+                transform((form) => form);
+            },
         });
     };
 
@@ -85,6 +108,9 @@ export default function Login({ status, canResetPassword }) {
                         </span>
                     </label>
                 </div>
+
+                <input type="hidden" name="recaptcha_token" value={data.recaptcha_token} />
+                <InputError message={errors.recaptcha_token} className="mt-2" />
 
                 <div className="mt-4 flex items-center justify-end">
                     {canResetPassword && (

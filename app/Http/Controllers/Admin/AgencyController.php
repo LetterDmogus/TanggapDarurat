@@ -9,6 +9,13 @@ use Inertia\Inertia;
 
 class AgencyController extends Controller
 {
+    private function assertRecycleBinAccess(Request $request): void
+    {
+        if (!$this->canViewRecycleBin($request)) {
+            abort(403, 'Only superadmin can access recycle bin.');
+        }
+    }
+
     private function canViewRecycleBin(Request $request): bool
     {
         return $request->user()?->isSuperAdmin() ?? false;
@@ -16,6 +23,7 @@ class AgencyController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = max(1, min(100, $request->integer('per_page', 10)));
         $query = Agency::query();
 
         if ($request->filled('search')) {
@@ -31,15 +39,13 @@ class AgencyController extends Controller
         $canViewRecycleBin = $this->canViewRecycleBin($request);
 
         if ($request->trashed === 'true') {
-            if (!$canViewRecycleBin) {
-                abort(403, 'Only admin or superadmin can access recycle bin.');
-            }
+            $this->assertRecycleBinAccess($request);
             $query->onlyTrashed();
         }
 
         return Inertia::render('Admin/Agencies/Index', [
-            'items' => $query->latest()->paginate(10)->withQueryString(),
-            'filters' => $request->only(['search', 'trashed']),
+            'items' => $query->latest()->paginate($perPage)->withQueryString(),
+            'filters' => $request->only(['search', 'trashed', 'per_page']),
             'canViewRecycleBin' => $canViewRecycleBin,
         ]);
     }
@@ -79,15 +85,17 @@ class AgencyController extends Controller
         return back()->with('success', 'Agency moved to recycle bin.');
     }
 
-    public function restore(int $id)
+    public function restore(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         Agency::withTrashed()->findOrFail($id)->restore();
 
         return back()->with('success', 'Agency restored successfully.');
     }
 
-    public function forceDelete(int $id)
+    public function forceDelete(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         Agency::withTrashed()->findOrFail($id)->forceDelete();
 
         return back()->with('success', 'Agency permanently deleted.');

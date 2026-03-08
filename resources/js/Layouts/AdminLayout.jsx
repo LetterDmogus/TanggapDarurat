@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
+import ApplicationLogo from '@/Components/ApplicationLogo';
 import {
     LayoutDashboard,
     Building2,
@@ -8,6 +9,10 @@ import {
     Route as RouteIcon,
     Users,
     ClipboardList,
+    ClipboardCheck,
+    History,
+    HardDriveDownload,
+    Settings,
     Menu,
     LogOut,
     User as UserIcon,
@@ -30,7 +35,8 @@ const SidebarLink = ({ href, active, icon: Icon, children }) => (
 );
 
 export default function AdminLayout({ header, children }) {
-    const { auth } = usePage().props;
+    const { auth, website } = usePage().props;
+    const siteName = website?.site_name || 'TanggapDarurat';
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -53,6 +59,14 @@ export default function AdminLayout({ header, children }) {
         { name: 'Routing Rules', href: route('admin.routing-rules.index'), icon: RouteIcon, active: route().current('admin.routing-rules.*') },
         { name: 'Users', href: route('admin.users.index'), icon: Users, active: route().current('admin.users.*') },
         { name: 'Reports', href: route('admin.reports.index'), icon: ClipboardList, active: route().current('admin.reports.*') },
+        { name: 'Assignments', href: route('admin.assignments.index'), icon: ClipboardCheck, active: route().current('admin.assignments.*') },
+        { name: 'Activity Logs', href: route('admin.activity-logs.index'), icon: History, active: route().current('admin.activity-logs.*') },
+        ...(auth.user.role === 'superadmin'
+            ? [
+                { name: 'Website Settings', href: route('admin.website-settings.edit'), icon: Settings, active: route().current('admin.website-settings.*') },
+                { name: 'Maintenance', href: route('admin.maintenance.index'), icon: HardDriveDownload, active: route().current('admin.maintenance.*') },
+            ]
+            : []),
     ];
 
     return (
@@ -65,9 +79,9 @@ export default function AdminLayout({ header, children }) {
                 <div className="h-full flex flex-col p-6">
                     <div className="flex items-center gap-3 mb-10 px-2">
                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                            <span className="text-primary-600 font-extrabold text-xl">TD</span>
+                            <ApplicationLogo className="h-8 w-8 object-contain" />
                         </div>
-                        <h1 className="text-xl font-bold tracking-tight">TanggapDarurat</h1>
+                        <h1 className="text-xl font-bold tracking-tight">{siteName}</h1>
                     </div>
 
                     <nav className="flex-1 space-y-2">
@@ -153,7 +167,7 @@ export default function AdminLayout({ header, children }) {
 
                 {/* Footer */}
                 <footer className="py-4 px-8 text-center text-xs text-surface-400 border-t border-surface-200 bg-white">
-                    &copy; {new Date().getFullYear()} TanggapDarurat AI System. All rights reserved.
+                    &copy; {new Date().getFullYear()} {siteName} AI System. All rights reserved.
                 </footer>
             </div>
         </div>

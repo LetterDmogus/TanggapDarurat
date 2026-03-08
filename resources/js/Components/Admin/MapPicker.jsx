@@ -17,10 +17,11 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-export default function MapPicker({ lat, lng, onChange, zoom = 13 }) {
+export default function MapPicker({ lat, lng, onChange, zoom = 13, markers = [] }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const markerRef = useRef(null);
+    const areaMarkersLayerRef = useRef(null);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [searching, setSearching] = useState(false);
@@ -48,6 +49,7 @@ export default function MapPicker({ lat, lng, onChange, zoom = 13 }) {
         }).addTo(mapInstance.current);
 
         markerRef.current = L.marker([initialLat, initialLng], { draggable: true }).addTo(mapInstance.current);
+        areaMarkersLayerRef.current = L.layerGroup().addTo(mapInstance.current);
 
         markerRef.current.on('dragend', () => {
             const position = markerRef.current.getLatLng();
@@ -68,9 +70,39 @@ export default function MapPicker({ lat, lng, onChange, zoom = 13 }) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
                 markerRef.current = null;
+                areaMarkersLayerRef.current = null;
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (!mapInstance.current || !areaMarkersLayerRef.current) return;
+
+        areaMarkersLayerRef.current.clearLayers();
+
+        markers.forEach((item) => {
+            const markerLat = Number(item.latitude ?? item.lat);
+            const markerLng = Number(item.longitude ?? item.lng);
+
+            if (Number.isNaN(markerLat) || Number.isNaN(markerLng)) {
+                return;
+            }
+
+            const circleMarker = L.circleMarker([markerLat, markerLng], {
+                radius: 7,
+                color: '#b91c1c',
+                weight: 2,
+                fillColor: '#ef4444',
+                fillOpacity: 0.7,
+            });
+
+            const title = item.name ?? 'Lokasi';
+            const subtitle = item.agency?.name ?? item.location_type ?? '';
+            const popup = subtitle ? `<strong>${title}</strong><br/>${subtitle}` : `<strong>${title}</strong>`;
+            circleMarker.bindPopup(popup);
+            circleMarker.addTo(areaMarkersLayerRef.current);
+        });
+    }, [markers]);
 
     useEffect(() => {
         if (!mapInstance.current || !markerRef.current) return;

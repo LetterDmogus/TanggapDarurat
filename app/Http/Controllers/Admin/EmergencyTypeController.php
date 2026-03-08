@@ -5,12 +5,20 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\EmergencyType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class EmergencyTypeController extends Controller
 {
+    private function assertRecycleBinAccess(Request $request): void
+    {
+        if (!$this->canViewRecycleBin($request)) {
+            abort(403, 'Only superadmin can access recycle bin.');
+        }
+    }
+
     private function canViewRecycleBin(Request $request): bool
     {
         return $request->user()?->isSuperAdmin() ?? false;
@@ -18,6 +26,7 @@ class EmergencyTypeController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = max(1, min(100, $request->integer('per_page', 10)));
         $query = EmergencyType::query();
 
         if ($request->filled('search')) {
@@ -36,15 +45,13 @@ class EmergencyTypeController extends Controller
         $canViewRecycleBin = $this->canViewRecycleBin($request);
 
         if ($request->trashed === 'true') {
-            if (!$canViewRecycleBin) {
-                abort(403, 'Only admin or superadmin can access recycle bin.');
-            }
+            $this->assertRecycleBinAccess($request);
             $query->onlyTrashed();
         }
 
         return Inertia::render('Admin/EmergencyTypes/Index', [
-            'items' => $query->latest()->paginate(10)->withQueryString(),
-            'filters' => $request->only(['search', 'is_need_location', 'trashed']),
+            'items' => $query->latest()->paginate($perPage)->withQueryString(),
+            'filters' => $request->only(['search', 'is_need_location', 'trashed', 'per_page']),
             'canViewRecycleBin' => $canViewRecycleBin,
         ]);
     }
@@ -66,6 +73,7 @@ class EmergencyTypeController extends Controller
             'is_need_location' => $validated['is_need_location'],
             'form_schema' => $this->decodeJsonNullable($validated['form_schema_text'] ?? null, 'form_schema_text'),
         ]);
+        Cache::forget('pelapor:emergency-types:create');
 
         return back()->with('success', 'Emergency type created successfully.');
     }
@@ -87,6 +95,7 @@ class EmergencyTypeController extends Controller
             'is_need_location' => $validated['is_need_location'],
             'form_schema' => $this->decodeJsonNullable($validated['form_schema_text'] ?? null, 'form_schema_text'),
         ]);
+        Cache::forget('pelapor:emergency-types:create');
 
         return back()->with('success', 'Emergency type updated successfully.');
     }
@@ -94,20 +103,25 @@ class EmergencyTypeController extends Controller
     public function destroy(EmergencyType $emergencyType)
     {
         $emergencyType->delete();
+        Cache::forget('pelapor:emergency-types:create');
 
         return back()->with('success', 'Emergency type moved to recycle bin.');
     }
 
-    public function restore(int $id)
+    public function restore(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         EmergencyType::withTrashed()->findOrFail($id)->restore();
+        Cache::forget('pelapor:emergency-types:create');
 
         return back()->with('success', 'Emergency type restored successfully.');
     }
 
-    public function forceDelete(int $id)
+    public function forceDelete(Request $request, int $id)
     {
+        $this->assertRecycleBinAccess($request);
         EmergencyType::withTrashed()->findOrFail($id)->forceDelete();
+        Cache::forget('pelapor:emergency-types:create');
 
         return back()->with('success', 'Emergency type permanently deleted.');
     }

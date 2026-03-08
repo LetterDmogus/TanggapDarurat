@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 export default function SearchFilter({ routeName, filters, extraFilters = [], includeTrashed = true }) {
     const [search, setSearch] = useState(filters.search || '');
     const [trashed, setTrashed] = useState(filters.trashed || '');
+    const [perPage, setPerPage] = useState(String(filters.per_page || '10'));
     const [others, setOthers] = useState(
         extraFilters.reduce((acc, f) => ({ ...acc, [f.key]: filters[f.key] || '' }), {})
     );
@@ -15,7 +16,7 @@ export default function SearchFilter({ routeName, filters, extraFilters = [], in
     const handleFilterChange = (key, value) => {
         const newFilters = { ...others, [key]: value };
         setOthers(newFilters);
-        applyFilters({ ...newFilters, search, ...(includeTrashed ? { trashed } : {}) });
+        applyFilters({ ...newFilters, search, per_page: perPage, ...(includeTrashed ? { trashed } : {}) });
     };
 
     const applyFilters = (params) => {
@@ -25,16 +26,17 @@ export default function SearchFilter({ routeName, filters, extraFilters = [], in
     const handleReset = () => {
         setSearch('');
         setTrashed('');
+        setPerPage('10');
         const resetOthers = extraFilters.reduce((acc, f) => ({ ...acc, [f.key]: '' }), {});
         setOthers(resetOthers);
-        applyFilters({});
+        applyFilters({ per_page: 10 });
     };
 
     // Use a delay for search to avoid too many requests
     useEffect(() => {
         if (prevSearch.current !== search) {
             const timer = setTimeout(() => {
-                applyFilters({ ...others, search, ...(includeTrashed ? { trashed } : {}) });
+                applyFilters({ ...others, search, per_page: perPage, ...(includeTrashed ? { trashed } : {}) });
             }, 500);
             prevSearch.current = search;
             return () => clearTimeout(timer);
@@ -104,6 +106,23 @@ export default function SearchFilter({ routeName, filters, extraFilters = [], in
                     </button>
                 </div>
             )}
+
+            <div className="min-w-[120px]">
+                <select
+                    className="form-select h-10 py-0"
+                    value={perPage}
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        setPerPage(value);
+                        applyFilters({ ...others, search, per_page: value, ...(includeTrashed ? { trashed } : {}) });
+                    }}
+                >
+                    <option value="10">10 / page</option>
+                    <option value="25">25 / page</option>
+                    <option value="50">50 / page</option>
+                    <option value="100">100 / page</option>
+                </select>
+            </div>
 
             <button
                 onClick={handleReset}
