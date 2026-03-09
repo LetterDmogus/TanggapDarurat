@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import MapPicker from '@/Components/Admin/MapPicker';
+import ImageEditorUploader from '@/Components/ImageEditorUploader';
 import Toast from '@/Components/Admin/Toast';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const OTHER_EMERGENCY_VALUE = 'others';
 
@@ -19,16 +20,25 @@ function normalizeSchema(formSchema) {
         .filter((field) => field.name && field.title);
 }
 
-export default function Create({ emergencyTypes, locations = [] }) {
+export default function Create({ emergencyTypes }) {
     const [metadataFields, setMetadataFields] = useState([]);
     const [metadataValues, setMetadataValues] = useState({});
+    const [geoMessage, setGeoMessage] = useState('Mencoba mengambil lokasi otomatis...');
+    const [branchCandidates, setBranchCandidates] = useState([]);
+    const [candidateMessage, setCandidateMessage] = useState('');
+    const [candidateLoading, setCandidateLoading] = useState(false);
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, transform, post, processing, errors } = useForm({
         emergency_type_id: '',
         other_emergency_title: '',
         description: '',
         latitude: '',
         longitude: '',
+        client_reported_at: '',
+        client_timezone: '',
+        client_utc_offset_minutes: '',
+        geo_accuracy_m: '',
+        geo_source: '',
         metadata_text: '',
         photos: [],
     });
@@ -40,24 +50,106 @@ export default function Create({ emergencyTypes, locations = [] }) {
     const isOtherEmergency = String(data.emergency_type_id) === OTHER_EMERGENCY_VALUE;
 
     const locationPins = useMemo(
-        () =>
-            locations
-                .map((location) => ({
-                    id: location.id,
-                    name: location.name,
-                    location_type: location.location_type,
-                    latitude: Number(location.latitude),
-                    longitude: Number(location.longitude),
-                    agency: location.agency,
-                }))
-                .filter((location) => !Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)),
-        [locations],
+        () => branchCandidates
+            .map((branch) => ({
+                id: branch.id,
+                name: branch.name,
+                location_type: 'branch',
+                latitude: Number(branch.latitude),
+                longitude: Number(branch.longitude),
+                agency: branch.agency,
+            }))
+            .filter((branch) => !Number.isNaN(branch.latitude) && !Number.isNaN(branch.longitude)),
+        [branchCandidates],
     );
 
-    const previews = useMemo(
-        () => data.photos.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
-        [data.photos],
-    );
+    useEffect(() => {
+        if (isOtherEmergency || !selectedEmergencyType?.is_need_location) {
+            setBranchCandidates([]);
+            setCandidateMessage('');
+            return;
+        }
+
+        if (!data.emergency_type_id || data.latitude === '' || data.longitude === '') {
+            setBranchCandidates([]);
+            setCandidateMessage('Pilih tipe emergency dan lokasi untuk melihat cabang primer terdekat.');
+            return;
+        }
+
+        const lat = Number(data.latitude);
+        const lng = Number(data.longitude);
+        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+            setBranchCandidates([]);
+            setCandidateMessage('Koordinat belum valid.');
+            return;
+        }
+
+        const controller = new AbortController();
+        const timer = window.setTimeout(async () => {
+            setCandidateLoading(true);
+            try {
+                const query = new URLSearchParams({
+                    emergency_type_id: String(data.emergency_type_id),
+                    latitude: String(lat),
+                    longitude: String(lng),
+                }).toString();
+
+                const response = await fetch(`${route('pelapor.reports.branch-candidates')}?${query}`, {
+                    signal: controller.signal,
+                    headers: { Accept: 'application/json' },
+                });
+                const payload = await response.json();
+                setBranchCandidates(Array.isArray(payload?.items) ? payload.items : []);
+                setCandidateMessage(payload?.meta?.message || '');
+            } catch {
+                if (!controller.signal.aborted) {
+                    setBranchCandidates([]);
+                    setCandidateMessage('Gagal mengambil kandidat cabang. Coba lagi.');
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setCandidateLoading(false);
+                }
+            }
+        }, 300);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(timer);
+        };
+    }, [data.emergency_type_id, data.latitude, data.longitude, isOtherEmergency, selectedEmergencyType?.is_need_location]);
+
+    useEffect(() => {
+        if (!window.navigator?.geolocation) {
+            setData('geo_source', 'fallback');
+            setGeoMessage('Browser tidak mendukung geolocation. Silakan pilih titik manual di map.');
+            return;
+        }
+
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        const offsetMinutes = -new Date().getTimezoneOffset();
+        setData('client_timezone', timezone);
+        setData('client_utc_offset_minutes', String(offsetMinutes));
+
+        window.navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setData('latitude', String(position.coords.latitude));
+                setData('longitude', String(position.coords.longitude));
+                setData('geo_accuracy_m', String(position.coords.accuracy ?? ''));
+                setData('geo_source', 'browser');
+                setGeoMessage('Lokasi otomatis berhasil didapatkan. Anda tetap bisa geser pin jika perlu.');
+            },
+            () => {
+                setData('geo_source', 'fallback');
+                setGeoMessage('Izin lokasi ditolak / gagal. Silakan pilih lokasi manual di map.');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000,
+            },
+        );
+    }, [setData]);
 
     const onEmergencyTypeChange = (value) => {
         setData('emergency_type_id', value);
@@ -66,8 +158,6 @@ export default function Create({ emergencyTypes, locations = [] }) {
             setMetadataFields([]);
             setMetadataValues({});
             setData('metadata_text', JSON.stringify({}));
-            setData('latitude', '');
-            setData('longitude', '');
             return;
         }
 
@@ -78,10 +168,6 @@ export default function Create({ emergencyTypes, locations = [] }) {
         setMetadataValues(nextValues);
         setData('metadata_text', JSON.stringify(nextValues));
 
-        if (!selected?.is_need_location) {
-            setData('latitude', '');
-            setData('longitude', '');
-        }
     };
 
     const onMetadataChange = (name, value, type) => {
@@ -91,18 +177,23 @@ export default function Create({ emergencyTypes, locations = [] }) {
         setData('metadata_text', JSON.stringify(next));
     };
 
-    const onPhotoChange = (event) => {
-        const files = Array.from(event.target.files ?? []);
-        setData('photos', files);
-    };
-
     const onMapChange = (lat, lng) => {
         setData('latitude', String(lat));
         setData('longitude', String(lng));
+        setData('geo_source', 'manual');
     };
 
     const submit = (event) => {
         event.preventDefault();
+
+        const now = new Date();
+        transform((current) => ({
+            ...current,
+            client_reported_at: now.toISOString(),
+            client_timezone: current.client_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+            client_utc_offset_minutes: current.client_utc_offset_minutes || String(-new Date().getTimezoneOffset()),
+            geo_source: current.geo_source || (current.latitude && current.longitude ? 'manual' : 'fallback'),
+        }));
 
         post(route('pelapor.reports.store'), {
             forceFormData: true,
@@ -257,7 +348,28 @@ export default function Create({ emergencyTypes, locations = [] }) {
                                         onChange={onMapChange}
                                         markers={locationPins}
                                     />
-                                    <p className="text-xs text-surface-500">Pin merah menunjukkan titik lokasi/area agency dari data tabel lokasi.</p>
+                                    <p className="text-xs text-surface-500">{geoMessage}</p>
+                                    <p className="text-xs text-surface-500">Pin merah menunjukkan cabang dari routing rule primary untuk tipe emergency terpilih.</p>
+                                    <div className="rounded-lg border border-surface-200 bg-surface-50 p-3">
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">Cabang Primer Terdekat</p>
+                                        {candidateLoading ? (
+                                            <p className="mt-2 text-sm text-surface-600">Memuat kandidat cabang...</p>
+                                        ) : branchCandidates.length > 0 ? (
+                                            <div className="mt-2 space-y-2">
+                                                {branchCandidates.slice(0, 5).map((branch) => (
+                                                    <div key={branch.id} className="rounded-md border border-surface-200 bg-white p-2 text-xs text-surface-700">
+                                                        <p className="font-semibold">{branch.agency?.name || '-'} - {branch.name}</p>
+                                                        <p>{branch.address || 'Alamat belum diisi'}</p>
+                                                        <p className="text-surface-500">
+                                                            Jarak: {Number.isFinite(Number(branch.distance_km)) ? `${Number(branch.distance_km).toFixed(2)} km` : '-'}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="mt-2 text-sm text-surface-600">{candidateMessage || 'Belum ada kandidat cabang.'}</p>
+                                        )}
+                                    </div>
                                     <div className="grid md:grid-cols-2 gap-3">
                                         <div>
                                             <label className="form-label">Latitude</label>
@@ -274,20 +386,12 @@ export default function Create({ emergencyTypes, locations = [] }) {
                             )}
 
                             <div>
-                                <label className="form-label">Upload Foto (Maks 8 foto)</label>
-                                <input type="file" accept="image/*" multiple onChange={onPhotoChange} />
-                                {errors.photos && <p className="text-xs text-red-500 mt-1">{errors.photos}</p>}
-                                {errors['photos.0'] && <p className="text-xs text-red-500 mt-1">{errors['photos.0']}</p>}
-                                {previews.length > 0 && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                                        {previews.map((preview) => (
-                                            <div key={preview.name} className="rounded-lg overflow-hidden border border-surface-200 bg-surface-50">
-                                                <img src={preview.url} alt={preview.name} className="w-full h-28 object-cover" />
-                                                <p className="px-2 py-1 text-xs text-surface-500 truncate">{preview.name}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                <ImageEditorUploader
+                                    label="Upload Foto (Maks 8 foto)"
+                                    helperText="Anda bisa rotate dan crop sederhana sebelum kirim."
+                                    onChange={(files) => setData('photos', files)}
+                                    errorText={errors.photos || errors['photos.0'] || ''}
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3">

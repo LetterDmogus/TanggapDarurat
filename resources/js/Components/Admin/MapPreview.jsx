@@ -17,7 +17,7 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-export default function MapPreview({ points = [], heightClass = 'h-[320px]' }) {
+export default function MapPreview({ points = [], heightClass = 'h-[320px]', markerVariant = 'default' }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const markersLayer = useRef(null);
@@ -64,8 +64,20 @@ export default function MapPreview({ points = [], heightClass = 'h-[320px]' }) {
             const lng = Number(point.longitude);
             if (Number.isNaN(lat) || Number.isNaN(lng)) return;
 
-            const marker = L.marker([lat, lng]);
-            marker.bindPopup(`<strong>${point.name || 'Unnamed location'}</strong>`);
+            const popupTitle = point.name || 'Unnamed location';
+            const popupSubtitle = point.subtitle ? `<br/>${point.subtitle}` : '';
+            const popupHtml = `<strong>${popupTitle}</strong>${popupSubtitle}`;
+
+            const marker = markerVariant === 'red-dot'
+                ? L.circleMarker([lat, lng], {
+                    radius: 7,
+                    color: '#b91c1c',
+                    weight: 2,
+                    fillColor: '#ef4444',
+                    fillOpacity: 0.8,
+                })
+                : L.marker([lat, lng]);
+            marker.bindPopup(popupHtml);
             marker.addTo(markersLayer.current);
             bounds.push([lat, lng]);
         });
@@ -76,7 +88,7 @@ export default function MapPreview({ points = [], heightClass = 'h-[320px]' }) {
         }
 
         mapInstance.current.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
-    }, [points]);
+    }, [points, markerVariant]);
 
     return (
         <div className={`w-full ${heightClass} border-2 border-surface-100 rounded-xl overflow-hidden shadow-inner`}>

@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Agency;
+use App\Models\AgencyBranch;
 use App\Models\Assignment;
 use App\Models\EmergencyType;
-use App\Models\Location;
 use App\Models\Report;
 use App\Models\RoutingRule;
 use App\Models\Step;
@@ -140,69 +140,6 @@ class ReportFlowTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)->get(route('admin.assignments.index'))->assertOk();
-    }
-
-    public function test_fire_or_building_damage_report_is_also_sent_to_area_agency(): void
-    {
-        Storage::fake('public');
-
-        $pelapor = User::factory()->create(['role' => 'pelapor']);
-        $agency = Agency::create([
-            'name' => 'Dinas Pemadam Kebakaran Test',
-            'type' => 'fire',
-            'area' => 'Batam',
-            'contact' => '0778-113',
-        ]);
-
-        $location = Location::create([
-            'name' => 'Area Cakupan Damkar',
-            'location_type' => 'coverage',
-            'latitude' => 1.1301000,
-            'longitude' => 104.0510000,
-            'agency_id' => $agency->id,
-        ]);
-
-        $type = EmergencyType::create([
-            'name' => 'kebakaran',
-            'display_name' => 'Kebakaran',
-            'description' => 'Insiden kebakaran',
-            'is_need_location' => true,
-            'form_schema' => [
-                'fields' => [
-                    ['title' => 'Tingkat Api', 'name' => 'severity', 'type' => 'select', 'options' => ['ringan', 'sedang', 'berat']],
-                ],
-            ],
-        ]);
-
-        $response = $this->actingAs($pelapor)->post(route('pelapor.reports.store'), [
-            'emergency_type_id' => $type->id,
-            'description' => 'Kebakaran ruko dekat area yang sudah dipetakan.',
-            'latitude' => 1.1301167,
-            'longitude' => 104.0510473,
-            'metadata_text' => json_encode([
-                'severity' => 'sedang',
-            ]),
-            'photos' => [
-                UploadedFile::fake()->image('photo-1.jpg'),
-            ],
-        ]);
-
-        $report = Report::first();
-
-        $response->assertRedirect(route('pelapor.reports.show', $report));
-        $this->assertDatabaseHas('reports', [
-            'id' => $report->id,
-            'location_id' => $location->id,
-        ]);
-
-        $this->assertDatabaseHas('assignments', [
-            'report_id' => $report->id,
-            'agency_id' => $agency->id,
-            'status' => 'pending',
-        ]);
-
-        $this->assertSame(1, Assignment::query()->count());
-        $this->assertGreaterThanOrEqual(2, Step::query()->where('report_id', $report->id)->count());
     }
 
     public function test_routing_rules_create_prioritized_assignments_and_update_report_status(): void
@@ -376,5 +313,124 @@ class ReportFlowTest extends TestCase
             'report_id' => $report->id,
             'message' => 'Laporan dikirim sebagai kategori Lainnya. Menunggu klasifikasi admin.',
         ]);
+    }
+
+    public function test_routing_rule_assigns_nearest_active_agency_branch(): void
+    {
+        Storage::fake('public');
+
+        $pelapor = User::factory()->create(['role' => 'pelapor']);
+        $agency = Agency::create([
+            'name' => 'BPBD Cabang',
+            'type' => 'disaster',
+            'area' => 'Batam',
+        ]);
+        $type = EmergencyType::create([
+            'name' => 'banjir_cabang',
+            'display_name' => 'Banjir Cabang',
+            'is_need_location' => true,
+            'form_schema' => ['fields' => []],
+        ]);
+
+        RoutingRule::create([
+            'emergency_type_id' => $type->id,
+            'agency_id' => $agency->id,
+            'priority' => 1,
+            'is_primary' => true,
+        ]);
+
+        $farBranch = AgencyBranch::create([
+            'agency_id' => $agency->id,
+            'name' => 'Cabang Jauh',
+            'latitude' => 1.1500000,
+            'longitude' => 104.1000000,
+            'is_active' => true,
+        ]);
+        $nearBranch = AgencyBranch::create([
+            'agency_id' => $agency->id,
+            'name' => 'Cabang Dekat',
+            'latitude' => 1.1300000,
+            'longitude' => 104.0500000,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($pelapor)->post(route('pelapor.reports.store'), [
+            'emergency_type_id' => $type->id,
+            'description' => 'Banjir terjadi dekat pusat kota.',
+            'latitude' => 1.1301000,
+            'longitude' => 104.0501000,
+            'metadata_text' => json_encode([]),
+            'photos' => [
+                UploadedFile::fake()->image('branch-1.jpg'),
+            ],
+        ]);
+
+        $report = Report::query()->first();
+        $response->assertRedirect(route('pelapor.reports.show', $report));
+
+        $assignment = Assignment::query()->where('report_id', $report->id)->first();
+        $this->assertNotNull($assignment);
+        $this->assertSame($nearBranch->id, (int) $assignment->agency_branch_id);
+        $this->assertNotNull($assignment->distance_km);
+        $this->assertNotSame($farBranch->id, (int) $assignment->agency_branch_id);
+    }
+
+    public function test_branch_candidates_endpoint_returns_primary_branch_recommendation(): void
+    {
+        $pelapor = User::factory()->create(['role' => 'pelapor']);
+        $primaryAgency = Agency::create([
+            'name' => 'Primary Agency',
+            'type' => 'disaster',
+            'area' => 'Batam',
+        ]);
+        $secondaryAgency = Agency::create([
+            'name' => 'Secondary Agency',
+            'type' => 'disaster',
+            'area' => 'Batam',
+        ]);
+        $type = EmergencyType::create([
+            'name' => 'banjir_preview',
+            'display_name' => 'Banjir Preview',
+            'is_need_location' => true,
+            'form_schema' => ['fields' => []],
+        ]);
+
+        RoutingRule::create([
+            'emergency_type_id' => $type->id,
+            'agency_id' => $primaryAgency->id,
+            'priority' => 1,
+            'is_primary' => true,
+        ]);
+        RoutingRule::create([
+            'emergency_type_id' => $type->id,
+            'agency_id' => $secondaryAgency->id,
+            'priority' => 2,
+            'is_primary' => false,
+        ]);
+
+        $nearPrimaryBranch = AgencyBranch::create([
+            'agency_id' => $primaryAgency->id,
+            'name' => 'Primary Near',
+            'latitude' => 1.1300000,
+            'longitude' => 104.0500000,
+            'is_active' => true,
+        ]);
+        AgencyBranch::create([
+            'agency_id' => $secondaryAgency->id,
+            'name' => 'Secondary Near',
+            'latitude' => 1.1300100,
+            'longitude' => 104.0500100,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($pelapor)->get(route('pelapor.reports.branch-candidates', [
+            'emergency_type_id' => $type->id,
+            'latitude' => 1.1301000,
+            'longitude' => 104.0501000,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('items.0.id', $nearPrimaryBranch->id);
+        $response->assertJsonMissing(['name' => 'Secondary Near']);
     }
 }

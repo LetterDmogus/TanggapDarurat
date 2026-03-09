@@ -1,11 +1,11 @@
 <?php
 
 use App\Http\Controllers\Admin\AgencyController;
+use App\Http\Controllers\Admin\AgencyBranchController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AssignmentController as AdminAssignmentController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EmergencyTypeController;
-use App\Http\Controllers\Admin\LocationController;
 use App\Http\Controllers\Admin\MaintenanceController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\RoutingRuleController;
@@ -80,14 +80,11 @@ Route::middleware(['auth', 'verified', 'role:superadmin,admin'])->prefix('admin'
     Route::resource('agencies', AgencyController::class)->except(['create', 'show', 'edit']);
     Route::post('agencies/{id}/restore', [AgencyController::class, 'restore'])->name('agencies.restore');
     Route::delete('agencies/{id}/force-delete', [AgencyController::class, 'forceDelete'])->name('agencies.force-delete');
+    Route::resource('agency-branches', AgencyBranchController::class)->except(['create', 'show', 'edit']);
 
     Route::resource('emergency-types', EmergencyTypeController::class)->except(['create', 'show', 'edit']);
     Route::post('emergency-types/{id}/restore', [EmergencyTypeController::class, 'restore'])->name('emergency-types.restore');
     Route::delete('emergency-types/{id}/force-delete', [EmergencyTypeController::class, 'forceDelete'])->name('emergency-types.force-delete');
-
-    Route::resource('locations', LocationController::class)->except(['create', 'show', 'edit']);
-    Route::post('locations/{id}/restore', [LocationController::class, 'restore'])->name('locations.restore');
-    Route::delete('locations/{id}/force-delete', [LocationController::class, 'forceDelete'])->name('locations.force-delete');
 
     Route::resource('routing-rules', RoutingRuleController::class)->except(['create', 'show', 'edit']);
     Route::post('routing-rules/{id}/restore', [RoutingRuleController::class, 'restore'])->name('routing-rules.restore');
@@ -131,6 +128,7 @@ Route::middleware(['auth', 'verified', 'role:instansi'])->prefix('instansi')->na
     Route::get('/dashboard', [InstansiDashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/assignments', [InstansiAssignmentController::class, 'index'])->name('assignments.index');
+    Route::get('/assignments/agency', [InstansiAssignmentController::class, 'indexAllBranches'])->name('assignments.index-agency');
     Route::patch('/assignments/{assignment}/status', [InstansiAssignmentController::class, 'updateStatus'])->name('assignments.update-status');
     Route::post('/assignments/{assignment}/completion', [InstansiAssignmentController::class, 'submitCompletion'])->name('assignments.submit-completion');
     Route::post('/assignments/{assignment}/steps', [InstansiAssignmentController::class, 'addStepNote'])->name('assignments.add-step');
@@ -145,6 +143,7 @@ Route::middleware(['auth', 'verified', 'role:pelapor'])->prefix('pelapor')->name
 
     Route::get('/reports', [PelaporReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/create', [PelaporReportController::class, 'create'])->name('reports.create');
+    Route::get('/reports/branch-candidates', [PelaporReportController::class, 'branchCandidates'])->name('reports.branch-candidates');
     Route::post('/reports', [PelaporReportController::class, 'store'])->name('reports.store');
     Route::get('/reports/{report}', [PelaporReportController::class, 'show'])->name('reports.show');
 });

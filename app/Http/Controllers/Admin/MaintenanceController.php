@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\EmergencyType;
-use App\Models\Location;
 use App\Models\RoutingRule;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -113,20 +112,13 @@ class MaintenanceController extends Controller
             'user_email_verified_at',
             'user_password',
             'user_agency_name',
-            'location_name',
-            'location_type',
-            'location_latitude',
-            'location_longitude',
-            'location_agency_name',
-            'location_metadata_json',
             'deleted_at',
         ];
 
         $agencies = Agency::withTrashed()->orderBy('id')->get();
         $users = User::withTrashed()->orderBy('id')->get();
-        $locations = Location::withTrashed()->orderBy('id')->get();
 
-        $callback = function () use ($columns, $agencies, $users, $locations): void {
+        $callback = function () use ($columns, $agencies, $users): void {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
@@ -137,12 +129,6 @@ class MaintenanceController extends Controller
                     $agency->type,
                     $agency->area,
                     $agency->contact,
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
                     '',
                     '',
                     '',
@@ -166,36 +152,7 @@ class MaintenanceController extends Controller
                     optional($user->email_verified_at)?->toDateTimeString(),
                     '',
                     optional($user->agency)->name,
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
                     optional($user->deleted_at)?->toDateTimeString(),
-                ]);
-            }
-
-            foreach ($locations as $location) {
-                fputcsv($file, [
-                    'location',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    '',
-                    $location->name,
-                    $location->location_type,
-                    $location->latitude,
-                    $location->longitude,
-                    optional($location->agency)->name,
-                    $location->metadata ? json_encode($location->metadata, JSON_UNESCAPED_UNICODE) : '',
-                    optional($location->deleted_at)?->toDateTimeString(),
                 ]);
             }
 
@@ -243,8 +200,6 @@ class MaintenanceController extends Controller
                         $this->importAgencyRow($data);
                     } elseif ($recordType === 'user') {
                         $this->importUserRow($data);
-                    } elseif ($recordType === 'location') {
-                        $this->importLocationRow($data);
                     } else {
                         $errorCount++;
                         continue;
@@ -464,41 +419,6 @@ class MaintenanceController extends Controller
         $this->applySoftDeleteState($user, $data['deleted_at'] ?? null);
     }
 
-    private function importLocationRow(array $data): void
-    {
-        $name = trim((string) ($data['location_name'] ?? ''));
-        if ($name === '') {
-            throw new \RuntimeException('location_name kosong');
-        }
-
-        $agency = null;
-        $agencyName = trim((string) ($data['location_agency_name'] ?? ''));
-        if ($agencyName !== '') {
-            $agency = Agency::withTrashed()->firstOrCreate(['name' => $agencyName]);
-        }
-
-        $latitude = $this->toNullableFloat($data['location_latitude'] ?? null);
-        $longitude = $this->toNullableFloat($data['location_longitude'] ?? null);
-
-        $location = Location::withTrashed()->firstOrNew([
-            'name' => $name,
-            'agency_id' => $agency?->id,
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-        ]);
-
-        $location->location_type = $this->emptyToNull($data['location_type'] ?? null);
-        $location->agency_id = $agency?->id;
-        $location->latitude = $latitude;
-        $location->longitude = $longitude;
-
-        $metadataJson = trim((string) ($data['location_metadata_json'] ?? ''));
-        $location->metadata = $metadataJson !== '' ? (json_decode($metadataJson, true) ?: null) : null;
-
-        $location->save();
-        $this->applySoftDeleteState($location, $data['deleted_at'] ?? null);
-    }
-
     private function importEmergencyTypeRow(array $data): void
     {
         $name = trim((string) ($data['emergency_name'] ?? ''));
@@ -574,16 +494,6 @@ class MaintenanceController extends Controller
 
         $string = trim((string) $value);
         return $string === '' ? null : $string;
-    }
-
-    private function toNullableFloat(mixed $value): ?float
-    {
-        $value = $this->emptyToNull($value);
-        if ($value === null) {
-            return null;
-        }
-
-        return (float) $value;
     }
 
     private function toBoolean(mixed $value): bool

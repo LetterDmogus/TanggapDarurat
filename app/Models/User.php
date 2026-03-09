@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -68,6 +69,13 @@ class User extends Authenticatable implements MustVerifyEmail
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class);
+    }
+
+    public function branches(): BelongsToMany
+    {
+        return $this->belongsToMany(AgencyBranch::class, 'agency_branch_user')
+            ->withPivot(['is_primary_branch'])
+            ->withTimestamps();
     }
 
     public function uploadedReportPhotos(): HasMany

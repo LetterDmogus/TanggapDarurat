@@ -1,7 +1,7 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ClipboardList, MapPin, User, Building2, Calendar, ArrowLeft } from 'lucide-react';
+import { ClipboardList, MapPin, User, Calendar, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Show({ report, emergencyTypes = [] }) {
@@ -268,19 +268,10 @@ export default function Show({ report, emergencyTypes = [] }) {
                         <div className="flex items-start gap-3 text-sm text-surface-700">
                             <MapPin className="mt-0.5 h-4 w-4 text-primary-600" />
                             <div>
-                                <p className="font-semibold">Lokasi</p>
-                                <p>{report.location?.name || '-'}</p>
+                                <p className="font-semibold">Koordinat Laporan</p>
                                 <p className="text-surface-500">
                                     {hasCoordinate ? `${report.latitude}, ${report.longitude}` : 'Koordinat tidak tersedia'}
                                 </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 text-sm text-surface-700">
-                            <Building2 className="mt-0.5 h-4 w-4 text-primary-600" />
-                            <div>
-                                <p className="font-semibold">Agensi Area Lokasi</p>
-                                <p>{report.location?.agency?.name || '-'}</p>
                             </div>
                         </div>
                     </div>
@@ -300,7 +291,7 @@ export default function Show({ report, emergencyTypes = [] }) {
                                     </div>
                                     <p className="mt-2 text-sm text-surface-600">{assignment.description || '-'}</p>
                                     <p className="mt-2 text-xs text-surface-500">
-                                        {assignment.date ? new Date(assignment.date).toLocaleString() : '-'} | Verified: {assignment.admin_verification ? 'Ya' : 'Belum'}
+                                        {assignment.date ? new Date(assignment.date).toLocaleString() : '-'} | Cabang: {assignment.branch?.name || '-'} | Jarak: {assignment.distance_km ? `${Number(assignment.distance_km).toFixed(2)} km` : '-'} | Verified: {assignment.admin_verification ? 'Ya' : 'Belum'}
                                     </p>
 
                                     {assignment.status === 'resolved' && assignment.photos?.length > 0 && (

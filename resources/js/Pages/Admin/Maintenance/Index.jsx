@@ -74,7 +74,7 @@ export default function Index({ backups = [] }) {
 
                 <div className="card space-y-3 p-4">
                     <h3 className="text-sm font-bold text-surface-900">Export Core Data</h3>
-                    <p className="text-xs text-surface-500">Users + Instansi + Locations dalam 1 file CSV.</p>
+                    <p className="text-xs text-surface-500">Users + Instansi dalam 1 file CSV.</p>
                     <a href={route('admin.maintenance.export-core')} className="btn-primary inline-flex items-center gap-2 text-sm">
                         <Download className="h-4 w-4" />
                         Export Core CSV
@@ -94,7 +94,7 @@ export default function Index({ backups = [] }) {
             <div className="grid gap-4 lg:grid-cols-2">
                 <ImportCard
                     title="Import Core CSV"
-                    description="Import users, instansi, dan locations."
+                    description="Import users dan instansi."
                     action={submitCoreImport}
                     processing={coreImport.processing}
                     onFileChange={(e) => coreImport.setData('file', e.target.files[0])}

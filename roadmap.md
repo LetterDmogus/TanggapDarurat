@@ -7,13 +7,15 @@
 - Phase 3: `DONE`
 - Phase 4: `DONE`
 - Phase 5: `DONE` (2026-03-08)
-- Phase 6+: `PENDING`
+- Phase 6: `PENDING`
+- Phase 7 (Revisi): `DONE` (2026-03-09)
+- Phase 8 (Fallback Handling): `IN PROGRESS`
 
 ## Arsitektur Inti
 - Backend: Laravel 11 (PHP 8.3)
 - Frontend: React + Inertia + Vite
 - Styling: Tailwind CSS
-- Database model utama: `agencies`, `emergency_types`, `routing_rules`, `locations`, `reports`, `assignments`, `report_photos`, `assignment_photos`
+- Database model utama: `agencies`, `agency_branches`, `emergency_types`, `routing_rules`, `reports`, `assignments`, `report_photos`, `assignment_photos`
 
 ## Role Sistem (standar aktif)
 - `superadmin`
@@ -56,11 +58,8 @@ Menjadikan sistem role-based sebagai baseline implementasi.
 ### Backend
 - CRUD `agencies`
 - CRUD `emergency_types`
-- CRUD `locations`
 - CRUD `routing_rules`
 - CRUD `user`
-
-- Implementasi leaflet.js untuk CRUD locations
 - Fitur soft delete untuk setiap data, hanya admin yang bisa lihat isi recycle bin nya
 
 ### Frontend
@@ -72,12 +71,10 @@ Menjadikan sistem role-based sebagai baseline implementasi.
 ### Progress (2026-03-04)
 - DONE: CRUD `agencies`
 - DONE: CRUD `emergency_types`
-- DONE: CRUD `locations`
 - DONE: CRUD `routing_rules`
 - DONE: CRUD `user`
 - DONE: Halaman admin CRUD + filter + pagination
 - DONE: Soft delete + recycle bin (superadmin-only) untuk master data
-- DONE: Map preview Leaflet di halaman locations
 
 ## FASE 3 - Sistem Pelaporan (DONE)
 ### Tujuan
@@ -123,3 +120,55 @@ Menyediakan alur end-to-end untuk `pelapor` membuat laporan darurat beserta bukt
 - Superadmin tools
 - Security hardening
 - Deployment dan optimasi
+
+## FASE 7 - Revisi Routing Cabang (DONE)
+### Tujuan
+Routing assignment mencari agensi/cabang terdekat sesuai titik laporan, dengan dukungan tampilan instansi per-cabang dan lintas-cabang.
+
+### Scope Revisi
+- Tambah data cabang agensi (`agency_branches`).
+- Tambah mapping user instansi ke cabang (`agency_branch_user`).
+- Assignment menyimpan cabang tujuan (`agency_branch_id`) + `distance_km`.
+- Routing engine memilih cabang terdekat pada agensi kandidat.
+- Halaman instansi dipisah 2 mode:
+  - `Cabang Saya`
+  - `Semua Cabang`
+
+### Progress Saat Ini
+- DONE: desain migration cabang + pivot user-cabang + kolom cabang assignment
+- DONE: model relasi branch pada `Agency`, `User`, `Assignment`
+- DONE: routing engine memilih cabang terdekat (berdasarkan koordinat laporan)
+- DONE: endpoint instansi 2 mode list assignment (`branch` vs `agency`)
+- DONE: tampilan assignment menampilkan cabang + jarak
+- DONE: CRUD admin untuk data cabang + manajemen anggota cabang
+- DONE: tampilan diagram branch per-agency agar relasi lebih mudah dibaca
+- DONE: auto-capture geolocation + waktu client saat pelapor membuat laporan (`client_reported_at`, `client_timezone`, `geo_source`, dst)
+- DONE: deprecate tabel `locations` dari domain aktif (lokasi kejadian disimpan langsung di `reports`)
+- DONE: hapus route/menu CRUD lokasi dari admin aktif
+- DONE: preview cabang primary terdekat di form buat laporan pelapor (berbasis koordinat + emergency type)
+
+## FASE 8 - Fallback Handling (PLANNED)
+### Tujuan
+Menjamin laporan tidak berhenti (deadlock) saat assignment ditolak/reject atau cabang tidak tersedia, dengan fallback otomatis ke cabang aktif terdekat.
+
+### Scope Utama
+- Fallback saat assignment `rejected`:
+  - sistem mencoba assign ulang ke cabang lain yang `active` dan paling dekat
+  - jika cabang dalam agency yang sama habis, eskalasi ke agency kandidat berikutnya dari routing rules
+  - untuk mencegah lemparan, agency bisa memilih kalau itu spam/palsu atau memang agency menolak
+- Fallback saat branch `inactive` / tidak valid koordinat:
+  - branch di-skip dari kandidat assignment
+  - sistem pilih kandidat valid berikutnya
+- Notifikasi dan audit:
+  - catat event fallback di `steps`
+  - tampilkan status fallback di dashboard/admin log
+- Guard rails:
+  - hindari loop fallback tanpa akhir (maks retry/attempt)
+  - cooldown/escalation delay yang bisa diatur
+
+### Prioritas Implementasi (Draft)
+1. Retry ke cabang aktif terdekat dalam agency yang sama jika laporan bukan ditandai sebagai spam
+2. Eskalasi ke agency secondary berdasarkan prioritas routing rules
+3. Tambah visibility status fallback di UI admin + instansi
+4. Tambah konfigurasi batas retry/cooldown
+5. Test matrix fallback end-to-end (reject, inactive, no-candidate)

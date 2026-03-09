@@ -57,6 +57,8 @@
   - dynamic metadata berdasarkan `emergency_type.form_schema`
   - upload multi-foto
   - map picker untuk lokasi
+  - auto-capture geolocation browser (dengan fallback manual)
+  - auto-capture waktu client (`client_reported_at`, timezone, UTC offset)
   - timeline steps
 - Routing engine (`RoutingAssignmentEngine`):
   - rule by emergency type + area
@@ -78,6 +80,14 @@
 - Optimasi gambar:
   - kompres saat upload via service `ImageOptimizer`
   - command kompres gambar lama: `php artisan photos:optimize-existing`
+
+## Metadata Waktu/Lokasi Laporan
+- `reports.client_reported_at`
+- `reports.client_timezone`
+- `reports.client_utc_offset_minutes`
+- `reports.geo_accuracy_m`
+- `reports.geo_source` (`browser` / `manual` / `fallback`)
+- `reports.server_received_at`
 
 ## Catatan Operasional
 - Extension/package baru terpasang (Maret 2026):

@@ -6,7 +6,6 @@ use App\Models\Agency;
 use App\Models\Assignment;
 use App\Models\AssignmentPhoto;
 use App\Models\EmergencyType;
-use App\Models\Location;
 use App\Models\Report;
 use App\Models\ReportPhoto;
 use App\Models\RoutingRule;
@@ -132,49 +131,6 @@ class SampleDataSeeder extends Seeder
             ),
         ];
 
-        $locations = [
-            'batam_center' => Location::updateOrCreate(
-                ['name' => 'Alun-Alun Batam Center'],
-                [
-                    'location_type' => 'public_area',
-                    'longitude' => 104.0510473,
-                    'latitude' => 1.1301167,
-                    'agency_id' => null,
-                    'metadata' => ['zone' => 'A', 'landmark' => 'Mega Mall'],
-                ]
-            ),
-            'nagoya' => Location::updateOrCreate(
-                ['name' => 'Nagoya Hill'],
-                [
-                    'location_type' => 'commercial',
-                    'longitude' => 104.0146040,
-                    'latitude' => 1.1466285,
-                    'agency_id' => null,
-                    'metadata' => ['zone' => 'B', 'crowd' => 'high'],
-                ]
-            ),
-            'damkar_pos_1' => Location::updateOrCreate(
-                ['name' => 'Pos Damkar Batam Kota'],
-                [
-                    'location_type' => 'station',
-                    'longitude' => 104.0555800,
-                    'latitude' => 1.1298200,
-                    'agency_id' => $agencies['damkar']->id,
-                    'metadata' => ['unit' => 'fire-01'],
-                ]
-            ),
-            'rsud' => Location::updateOrCreate(
-                ['name' => 'RSUD Embung Fatimah'],
-                [
-                    'location_type' => 'hospital',
-                    'longitude' => 104.0409770,
-                    'latitude' => 1.0986070,
-                    'agency_id' => $agencies['dinkes']->id,
-                    'metadata' => ['er' => true],
-                ]
-            ),
-        ];
-
         RoutingRule::updateOrCreate(
             ['emergency_type_id' => $emergencyTypes['kebakaran']->id, 'agency_id' => $agencies['damkar']->id, 'area' => 'Batam'],
             ['priority' => 1, 'is_primary' => true]
@@ -281,7 +237,6 @@ class SampleDataSeeder extends Seeder
         ];
 
         $reportFirePayload = [
-            'location_id' => $locations['batam_center']->id,
             'status' => 'pending',
             'description' => 'Terlihat asap tebal dari ruko lantai dua.',
             'longitude' => 104.0510473,
@@ -298,7 +253,6 @@ class SampleDataSeeder extends Seeder
         );
 
         $reportFloodPayload = [
-            'location_id' => $locations['nagoya']->id,
             'status' => 'assigned',
             'description' => 'Jalan utama tergenang, kendaraan sulit lewat.',
             'longitude' => 104.0146040,
@@ -315,7 +269,6 @@ class SampleDataSeeder extends Seeder
         );
 
         $reportCyberPayload = [
-            'location_id' => null,
             'status' => 'review',
             'description' => 'Ada link phishing mengatasnamakan layanan pemerintah.',
             'longitude' => null,

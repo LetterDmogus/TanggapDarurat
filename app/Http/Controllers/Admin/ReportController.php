@@ -66,11 +66,10 @@ class ReportController extends Controller
         $report->load([
             'emergencyType:id,name,display_name,description,is_need_location',
             'user:id,name,email',
-            'location:id,name,location_type,latitude,longitude,agency_id',
-            'location.agency:id,name',
             'photos:id,report_id,file_path,uploaded_at',
-            'assignments:id,report_id,agency_id,is_primary,status,description,admin_verification,date,created_at',
+            'assignments:id,report_id,agency_id,agency_branch_id,is_primary,status,description,distance_km,admin_verification,date,created_at',
             'assignments.agency:id,name,type,area,contact',
+            'assignments.branch:id,agency_id,name',
             'assignments.photos:id,assignment_id,file_path,uploaded_by,uploaded_at',
         ]);
 
@@ -88,17 +87,6 @@ class ReportController extends Controller
                 'created_at' => $report->created_at?->toISOString(),
                 'emergency_type' => $report->emergencyType,
                 'pelapor' => $report->user,
-                'location' => $report->location ? [
-                    'id' => $report->location->id,
-                    'name' => $report->location->name,
-                    'location_type' => $report->location->location_type,
-                    'latitude' => $report->location->latitude,
-                    'longitude' => $report->location->longitude,
-                    'agency' => $report->location->agency ? [
-                        'id' => $report->location->agency->id,
-                        'name' => $report->location->agency->name,
-                    ] : null,
-                ] : null,
                 'photos' => $report->photos->map(fn ($photo) => [
                     'id' => $photo->id,
                     'url' => '/storage/'.ltrim($photo->file_path, '/'),
@@ -109,6 +97,7 @@ class ReportController extends Controller
                     'is_primary' => (bool) $assignment->is_primary,
                     'status' => $assignment->status,
                     'description' => $assignment->description,
+                    'distance_km' => $assignment->distance_km,
                     'admin_verification' => (bool) $assignment->admin_verification,
                     'date' => $assignment->date?->toISOString(),
                     'created_at' => $assignment->created_at?->toISOString(),
@@ -118,6 +107,10 @@ class ReportController extends Controller
                         'type' => $assignment->agency->type,
                         'area' => $assignment->agency->area,
                         'contact' => $assignment->agency->contact,
+                    ] : null,
+                    'branch' => $assignment->branch ? [
+                        'id' => $assignment->branch->id,
+                        'name' => $assignment->branch->name,
                     ] : null,
                     'photos' => $assignment->photos->map(fn ($photo) => [
                         'id' => $photo->id,

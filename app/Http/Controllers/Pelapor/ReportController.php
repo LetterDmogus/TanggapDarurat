@@ -4,23 +4,21 @@ namespace App\Http\Controllers\Pelapor;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReportRequest;
-use App\Models\Assignment;
+use App\Models\AgencyBranch;
 use App\Models\EmergencyType;
-use App\Models\Location;
 use App\Models\Report;
 use App\Models\ReportPhoto;
+use App\Models\RoutingRule;
 use App\Models\Step;
 use App\Services\ImageOptimizer;
 use App\Services\RoutingAssignmentEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ReportController extends Controller
 {
-    private const AREA_MATCH_RADIUS_KM = 2.0;
     private const OTHER_EMERGENCY_NAME = 'lainnya';
 
     public function index(Request $request)
@@ -73,23 +71,74 @@ class ReportController extends Controller
                 ->where('name', '!=', self::OTHER_EMERGENCY_NAME)
                 ->orderBy('display_name')
                 ->get()),
-            'locations' => Cache::remember('pelapor:locations:create', now()->addMinutes(10), fn () => Location::query()
-                ->with('agency:id,name')
-                ->whereNotNull('latitude')
-                ->whereNotNull('longitude')
-                ->orderBy('name')
-                ->get(['id', 'name', 'location_type', 'longitude', 'latitude', 'agency_id'])
-                ->map(fn (Location $location) => [
-                    'id' => $location->id,
-                    'name' => $location->name,
-                    'location_type' => $location->location_type,
-                    'longitude' => $location->longitude,
-                    'latitude' => $location->latitude,
-                    'agency' => $location->agency ? [
-                        'id' => $location->agency->id,
-                        'name' => $location->agency->name,
+        ]);
+    }
+
+    public function branchCandidates(Request $request)
+    {
+        $this->authorize('create', Report::class);
+
+        $validated = $request->validate([
+            'emergency_type_id' => ['required', 'integer', 'exists:emergency_types,id'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $reportLat = (float) $validated['latitude'];
+        $reportLng = (float) $validated['longitude'];
+
+        $primaryAgencyIds = RoutingRule::query()
+            ->where('emergency_type_id', (int) $validated['emergency_type_id'])
+            ->where('is_primary', true)
+            ->pluck('agency_id')
+            ->unique()
+            ->values();
+
+        if ($primaryAgencyIds->isEmpty()) {
+            return response()->json([
+                'items' => [],
+                'meta' => ['message' => 'Belum ada routing rule primary untuk tipe emergency ini.'],
+            ]);
+        }
+
+        $branches = AgencyBranch::query()
+            ->with('agency:id,name')
+            ->whereIn('agency_id', $primaryAgencyIds->all())
+            ->where('is_active', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get(['id', 'agency_id', 'name', 'address', 'latitude', 'longitude']);
+
+        $items = $branches
+            ->map(function (AgencyBranch $branch) use ($reportLat, $reportLng) {
+                $distanceKm = $this->distanceKm(
+                    $reportLat,
+                    $reportLng,
+                    (float) $branch->latitude,
+                    (float) $branch->longitude,
+                );
+
+                return [
+                    'id' => $branch->id,
+                    'name' => $branch->name,
+                    'address' => $branch->address,
+                    'latitude' => $branch->latitude,
+                    'longitude' => $branch->longitude,
+                    'agency' => $branch->agency ? [
+                        'id' => $branch->agency->id,
+                        'name' => $branch->agency->name,
                     ] : null,
-                ])->values()),
+                    'distance_km' => round($distanceKm, 2),
+                ];
+            })
+            ->sortBy('distance_km')
+            ->take(20)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'items' => $items,
+            'meta' => ['message' => count($items) > 0 ? null : 'Belum ada cabang aktif untuk routing primary.'],
         ]);
     }
 
@@ -104,15 +153,9 @@ class ReportController extends Controller
                 ? $this->getOrCreateOtherEmergencyType()
                 : EmergencyType::query()->select('id', 'name', 'display_name')->findOrFail($request->integer('emergency_type_id'));
 
-            $matchedLocation = $this->findNearestLocation(
-                $request->input('latitude'),
-                $request->input('longitude'),
-            );
-
             $report = Report::create([
                 'emergency_type_id' => $emergencyType->id,
                 'user_id' => $request->user()->id,
-                'location_id' => $matchedLocation?->id,
                 'status' => $isOtherEmergency ? 'triage' : 'submitted',
                 'is_other_emergency' => $isOtherEmergency,
                 'description' => $request->string('description')->toString(),
@@ -121,6 +164,12 @@ class ReportController extends Controller
                 'latitude' => $request->input('latitude'),
                 'metadata' => $request->parsedMetadata(),
                 'date' => now(),
+                'client_reported_at' => $request->input('client_reported_at'),
+                'client_timezone' => $request->input('client_timezone'),
+                'client_utc_offset_minutes' => $request->input('client_utc_offset_minutes'),
+                'geo_accuracy_m' => $request->input('geo_accuracy_m'),
+                'geo_source' => $request->input('geo_source') ?: ((is_numeric($request->input('latitude')) && is_numeric($request->input('longitude'))) ? 'manual' : 'fallback'),
+                'server_received_at' => now(),
             ]);
 
             Step::create([
@@ -148,12 +197,7 @@ class ReportController extends Controller
             }
 
             if (!$isOtherEmergency) {
-                $createdAssignments = $routingEngine->routeReport($report);
-
-                // Backward-compatible fallback for legacy area-auto assignment when no routing rule matches.
-                if ($createdAssignments === 0) {
-                    $this->createAreaAssignmentIfRelevant($report, $emergencyType, $matchedLocation);
-                }
+                $routingEngine->routeReport($report);
             }
 
             return $report;
@@ -162,88 +206,6 @@ class ReportController extends Controller
         return redirect()
             ->route('pelapor.reports.show', $report)
             ->with('success', 'Laporan berhasil dikirim.');
-    }
-
-    private function createAreaAssignmentIfRelevant(Report $report, EmergencyType $emergencyType, ?Location $location): void
-    {
-        if (!$location?->agency_id || !$this->isFireOrBuildingDamageType($emergencyType)) {
-            return;
-        }
-
-        $assignment = Assignment::query()->firstOrCreate(
-            [
-                'report_id' => $report->id,
-                'agency_id' => $location->agency_id,
-            ],
-            [
-                'status' => 'pending',
-                'is_primary' => true,
-                'description' => 'Auto-assigned berdasarkan area lokasi laporan.',
-                'admin_verification' => false,
-                'date' => now(),
-            ],
-        );
-
-        if ($assignment->wasRecentlyCreated) {
-            Step::create([
-                'report_id' => $report->id,
-                'assignment_id' => $assignment->id,
-                'message' => 'Instansi telah ditugaskan, menunggu status.',
-            ]);
-        }
-    }
-
-    private function findNearestLocation(mixed $latitude, mixed $longitude): ?Location
-    {
-        if (!is_numeric($latitude) || !is_numeric($longitude)) {
-            return null;
-        }
-
-        $lat = (float) $latitude;
-        $lng = (float) $longitude;
-
-        $locations = Location::query()
-            ->whereNotNull('agency_id')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get(['id', 'agency_id', 'latitude', 'longitude']);
-
-        $nearest = null;
-        $nearestDistance = null;
-
-        foreach ($locations as $location) {
-            $distance = $this->distanceKm(
-                $lat,
-                $lng,
-                (float) $location->latitude,
-                (float) $location->longitude,
-            );
-
-            if ($nearestDistance === null || $distance < $nearestDistance) {
-                $nearestDistance = $distance;
-                $nearest = $location;
-            }
-        }
-
-        if ($nearestDistance === null || $nearestDistance > self::AREA_MATCH_RADIUS_KM) {
-            return null;
-        }
-
-        return $nearest;
-    }
-
-    private function isFireOrBuildingDamageType(EmergencyType $emergencyType): bool
-    {
-        $haystack = Str::lower(trim(($emergencyType->name ?? '').' '.($emergencyType->display_name ?? '')));
-
-        return Str::contains($haystack, [
-            'kebakaran',
-            'fire',
-            'bangunan rusak',
-            'bangunan_rusak',
-            'kerusakan bangunan',
-            'building damage',
-        ]);
     }
 
     private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float

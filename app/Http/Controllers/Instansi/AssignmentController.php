@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Instansi;
 
 use App\Http\Controllers\Controller;
+use App\Models\AgencyBranch;
 use App\Models\Assignment;
 use App\Models\AssignmentPhoto;
 use App\Models\EmergencyType;
@@ -18,20 +19,41 @@ class AssignmentController extends Controller
 {
     public function index(Request $request)
     {
+        return $this->renderIndex($request, 'branch');
+    }
+
+    public function indexAllBranches(Request $request)
+    {
+        return $this->renderIndex($request, 'agency');
+    }
+
+    private function renderIndex(Request $request, string $scope)
+    {
         $agencyId = $request->user()?->agency_id;
         if (!$agencyId) {
             abort(403, 'Instansi account is not linked to any agency.');
         }
 
+        $userBranchIds = $this->resolveUserBranchIds($request, (int) $agencyId);
+
         $query = Assignment::query()
             ->with([
                 'agency:id,name',
+                'branch:id,agency_id,name',
                 'report:id,emergency_type_id,user_id,status,description,created_at',
                 'report.emergencyType:id,name,display_name',
                 'report.user:id,name',
             ])
             ->where('agency_id', $agencyId)
             ->latest();
+
+        if ($scope === 'branch') {
+            if ($userBranchIds === []) {
+                $query->whereNull('agency_branch_id');
+            } else {
+                $query->whereIn('agency_branch_id', $userBranchIds);
+            }
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());
@@ -50,37 +72,49 @@ class AssignmentController extends Controller
         }
 
         return Inertia::render('Instansi/Assignments/Index', [
-            'items' => $query->paginate(10)->withQueryString()->through(function (Assignment $assignment) {
+            'items' => $query->paginate(10)->withQueryString()->through(function (Assignment $assignment) use ($agencyId, $userBranchIds) {
                 $effectivePrimary = $this->isPrimaryForWorkflow($assignment);
+                $canManage = $this->canManageAssignmentByBranchIds($assignment, (int) $agencyId, $userBranchIds);
 
                 return [
-                'id' => $assignment->id,
-                'status' => $assignment->status,
-                'is_primary' => $effectivePrimary,
-                'description' => $assignment->description,
-                'date' => $assignment->date?->toISOString(),
-                'created_at' => $assignment->created_at?->toISOString(),
-                'available_transitions' => array_values(array_filter(
-                    Assignment::statuses(),
-                    fn (string $nextStatus) => $this->canTransitionFromUI($assignment, $nextStatus),
-                )),
-                'can_submit_completion' => $this->canSubmitCompletion($assignment, $effectivePrimary),
-                'agency' => $assignment->agency ? [
-                    'id' => $assignment->agency->id,
-                    'name' => $assignment->agency->name,
-                ] : null,
-                'report' => $assignment->report ? [
-                    'id' => $assignment->report->id,
-                    'status' => $assignment->report->status,
-                    'description' => $assignment->report->description,
-                    'created_at' => $assignment->report->created_at?->toISOString(),
-                    'emergency_type' => $assignment->report->emergencyType,
-                    'pelapor' => $assignment->report->user,
-                ] : null,
+                    'id' => $assignment->id,
+                    'status' => $assignment->status,
+                    'is_primary' => $effectivePrimary,
+                    'can_manage' => $canManage,
+                    'description' => $assignment->description,
+                    'distance_km' => $assignment->distance_km,
+                    'date' => $assignment->date?->toISOString(),
+                    'created_at' => $assignment->created_at?->toISOString(),
+                    'available_transitions' => $canManage
+                        ? array_values(array_filter(
+                            Assignment::statuses(),
+                            fn (string $nextStatus) => $this->canTransitionFromUI($assignment, $nextStatus),
+                        ))
+                        : [],
+                    'can_submit_completion' => $canManage
+                        ? $this->canSubmitCompletion($assignment, $effectivePrimary)
+                        : false,
+                    'agency' => $assignment->agency ? [
+                        'id' => $assignment->agency->id,
+                        'name' => $assignment->agency->name,
+                    ] : null,
+                    'branch' => $assignment->branch ? [
+                        'id' => $assignment->branch->id,
+                        'name' => $assignment->branch->name,
+                    ] : null,
+                    'report' => $assignment->report ? [
+                        'id' => $assignment->report->id,
+                        'status' => $assignment->report->status,
+                        'description' => $assignment->report->description,
+                        'created_at' => $assignment->report->created_at?->toISOString(),
+                        'emergency_type' => $assignment->report->emergencyType,
+                        'pelapor' => $assignment->report->user,
+                    ] : null,
                 ];
             }),
             'filters' => $request->only(['status', 'q', 'emergency_type_id']),
             'statuses' => Assignment::statuses(),
+            'scope' => $scope,
             'emergency_types' => EmergencyType::query()
                 ->orderBy('display_name')
                 ->orderBy('name')
@@ -96,13 +130,13 @@ class AssignmentController extends Controller
 
     public function updateStatus(Request $request, Assignment $assignment)
     {
-        $agencyId = $request->user()?->agency_id;
-        if (!$agencyId || (int) $assignment->agency_id !== (int) $agencyId) {
+        if (!$this->canManageAssignment($request, $assignment)) {
             abort(403, 'You are not allowed to update this assignment.');
         }
 
         $validated = $request->validate([
             'status' => 'required|string|in:'.implode(',', Assignment::statuses()),
+            'reject_type' => 'nullable|string|in:assignment_only,report_reject',
         ]);
 
         $nextStatus = $validated['status'];
@@ -119,6 +153,17 @@ class AssignmentController extends Controller
         if (!$this->canTransitionWithBusinessRules($assignment, $nextStatus)) {
             return back()->withErrors([
                 'status' => 'Transisi belum memenuhi prasyarat workflow.',
+            ]);
+        }
+
+        $isPrimary = $this->isPrimaryForWorkflow($assignment);
+        $rejectType = $nextStatus === Assignment::STATUS_REJECTED
+            ? ($validated['reject_type'] ?? ($isPrimary ? 'report_reject' : 'assignment_only'))
+            : null;
+
+        if ($nextStatus === Assignment::STATUS_REJECTED && $rejectType === 'report_reject' && !$isPrimary) {
+            return back()->withErrors([
+                'reject_type' => 'Reject report hanya tersedia untuk assignment primary.',
             ]);
         }
 
@@ -141,16 +186,16 @@ class AssignmentController extends Controller
             ),
         ]);
 
-        $isPrimary = $this->isPrimaryForWorkflow($assignment);
-
         if ($isPrimary && $nextStatus === Assignment::STATUS_ON_PROGRESS) {
             $this->promoteQueuedAssignmentsToPending($assignment);
         }
-        if ($isPrimary && $nextStatus === Assignment::STATUS_REJECTED) {
+        if ($isPrimary && $nextStatus === Assignment::STATUS_REJECTED && $rejectType === 'report_reject') {
             $this->rejectSecondaryAssignments($assignment);
         }
 
-        if ($isPrimary) {
+        if ($isPrimary && $nextStatus === Assignment::STATUS_REJECTED && $rejectType === 'assignment_only') {
+            $this->transferPrimaryAfterAssignmentReject($assignment);
+        } elseif ($isPrimary) {
             $this->syncReportStatusFromPrimaryAssignment($assignment->report, $assignment);
         }
 
@@ -159,8 +204,7 @@ class AssignmentController extends Controller
 
     public function submitCompletion(Request $request, Assignment $assignment, ImageOptimizer $imageOptimizer)
     {
-        $agencyId = $request->user()?->agency_id;
-        if (!$agencyId || (int) $assignment->agency_id !== (int) $agencyId) {
+        if (!$this->canManageAssignment($request, $assignment)) {
             abort(403, 'You are not allowed to submit completion for this assignment.');
         }
 
@@ -228,8 +272,7 @@ class AssignmentController extends Controller
 
     public function addStepNote(Request $request, Assignment $assignment)
     {
-        $agencyId = $request->user()?->agency_id;
-        if (!$agencyId || (int) $assignment->agency_id !== (int) $agencyId) {
+        if (!$this->canManageAssignment($request, $assignment)) {
             abort(403, 'You are not allowed to add note to this assignment.');
         }
 
@@ -273,9 +316,12 @@ class AssignmentController extends Controller
             'user:id,name,email',
             'photos:id,report_id,file_path,uploaded_at',
             'steps:id,report_id,assignment_id,message,created_at',
-            'assignments:id,report_id,agency_id,is_primary,status,description,date,created_at',
+            'assignments:id,report_id,agency_id,agency_branch_id,is_primary,status,description,distance_km,date,created_at',
             'assignments.agency:id,name',
+            'assignments.branch:id,agency_id,name',
         ]);
+
+        $userBranchIds = $this->resolveUserBranchIds($request, (int) $agencyId);
 
         return Inertia::render('Instansi/Reports/Show', [
             'report' => [
@@ -307,20 +353,25 @@ class AssignmentController extends Controller
                     'is_primary' => (bool) $assignment->is_primary,
                     'status' => $assignment->status,
                     'description' => $assignment->description,
+                    'distance_km' => $assignment->distance_km,
                     'date' => $assignment->date?->toISOString(),
-                    'can_manage' => (int) $assignment->agency_id === (int) $agencyId,
-                    'available_transitions' => (int) $assignment->agency_id === (int) $agencyId
+                    'can_manage' => $this->canManageAssignmentByBranchIds($assignment, (int) $agencyId, $userBranchIds),
+                    'available_transitions' => $this->canManageAssignmentByBranchIds($assignment, (int) $agencyId, $userBranchIds)
                         ? array_values(array_filter(
                             Assignment::statuses(),
                             fn (string $nextStatus) => $this->canTransitionFromUI($assignment, $nextStatus),
                         ))
                         : [],
-                    'can_submit_completion' => (int) $assignment->agency_id === (int) $agencyId
+                    'can_submit_completion' => $this->canManageAssignmentByBranchIds($assignment, (int) $agencyId, $userBranchIds)
                         ? $this->canSubmitCompletion($assignment, $this->isPrimaryForWorkflow($assignment))
                         : false,
                     'agency' => $assignment->agency ? [
                         'id' => $assignment->agency->id,
                         'name' => $assignment->agency->name,
+                    ] : null,
+                    'branch' => $assignment->branch ? [
+                        'id' => $assignment->branch->id,
+                        'name' => $assignment->branch->name,
                     ] : null,
                 ])->values()->all(),
             ],
@@ -447,6 +498,105 @@ class AssignmentController extends Controller
         }
     }
 
+    private function transferPrimaryAfterAssignmentReject(Assignment $rejectedPrimary): void
+    {
+        $report = Report::query()->find($rejectedPrimary->report_id);
+        if (!$report) {
+            return;
+        }
+
+        $fallbackBranch = $this->resolveFallbackBranchInSameAgency($rejectedPrimary, $report);
+
+        if (!$fallbackBranch) {
+            if ($report->status !== 'rejected') {
+                $report->update(['status' => 'rejected']);
+            }
+            Step::create([
+                'report_id' => $report->id,
+                'message' => 'Primary reject assignment-only, tetapi tidak ada cabang aktif pengganti dalam agency yang sama. Status laporan menjadi rejected.',
+            ]);
+
+            return;
+        }
+
+        $rejectedPrimary->update(['is_primary' => false]);
+
+        $distanceKm = null;
+        if (is_numeric($report->latitude) && is_numeric($report->longitude) && is_numeric($fallbackBranch->latitude) && is_numeric($fallbackBranch->longitude)) {
+            $distanceKm = $this->distanceKm(
+                (float) $report->latitude,
+                (float) $report->longitude,
+                (float) $fallbackBranch->latitude,
+                (float) $fallbackBranch->longitude,
+            );
+        }
+
+        $fallback = Assignment::create([
+            'report_id' => $rejectedPrimary->report_id,
+            'agency_id' => $rejectedPrimary->agency_id,
+            'agency_branch_id' => $fallbackBranch->id,
+            'is_primary' => true,
+            'status' => Assignment::STATUS_PENDING,
+            'description' => 'Auto fallback: primary assignment dipindahkan ke cabang aktif lain.',
+            'distance_km' => $distanceKm,
+            'admin_verification' => false,
+            'date' => now(),
+        ]);
+
+        Step::create([
+            'report_id' => $report->id,
+            'assignment_id' => $fallback->id,
+            'message' => sprintf(
+                'Primary dipindahkan ke cabang %s (agency yang sama) setelah assignment primary sebelumnya ditolak.',
+                $fallbackBranch->name,
+            ),
+        ]);
+
+        $this->syncReportStatusFromPrimaryAssignment($report, $fallback);
+    }
+
+    private function resolveFallbackBranchInSameAgency(Assignment $rejectedPrimary, Report $report): ?AgencyBranch
+    {
+        $branches = AgencyBranch::query()
+            ->where('agency_id', $rejectedPrimary->agency_id)
+            ->where('is_active', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->when($rejectedPrimary->agency_branch_id, fn ($q) => $q->where('id', '!=', $rejectedPrimary->agency_branch_id))
+            ->get();
+
+        if ($branches->isEmpty()) {
+            return null;
+        }
+
+        if (!is_numeric($report->latitude) || !is_numeric($report->longitude)) {
+            return $branches->sortBy('id')->first();
+        }
+
+        $reportLat = (float) $report->latitude;
+        $reportLng = (float) $report->longitude;
+
+        return $branches->sortBy(function (AgencyBranch $branch) use ($reportLat, $reportLng) {
+            return $this->distanceKm(
+                $reportLat,
+                $reportLng,
+                (float) $branch->latitude,
+                (float) $branch->longitude,
+            );
+        })->first();
+    }
+
+    private function distanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadiusKm = 6371;
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lngDelta = deg2rad($lng2 - $lng1);
+        $a = sin($latDelta / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lngDelta / 2) ** 2;
+
+        return 2 * $earthRadiusKm * asin(min(1, sqrt($a)));
+    }
+
     private function syncReportStatusFromPrimaryAssignment(Report $report, Assignment $primaryAssignment): void
     {
         if ($primaryAssignment->status === Assignment::STATUS_ON_PROGRESS) {
@@ -503,5 +653,46 @@ class AssignmentController extends Controller
             ->value('id');
 
         return (int) $assignment->id === (int) $fallbackPrimaryId;
+    }
+
+    private function resolveUserBranchIds(Request $request, int $agencyId): array
+    {
+        $user = $request->user();
+        if (!$user || (int) $user->agency_id !== $agencyId) {
+            return [];
+        }
+
+        return $user->branches()
+            ->where('agency_id', $agencyId)
+            ->pluck('agency_branches.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function canManageAssignment(Request $request, Assignment $assignment): bool
+    {
+        $agencyId = $request->user()?->agency_id;
+        if (!$agencyId || (int) $assignment->agency_id !== (int) $agencyId) {
+            return false;
+        }
+
+        $userBranchIds = $this->resolveUserBranchIds($request, (int) $agencyId);
+
+        return $this->canManageAssignmentByBranchIds($assignment, (int) $agencyId, $userBranchIds);
+    }
+
+    private function canManageAssignmentByBranchIds(Assignment $assignment, int $agencyId, array $userBranchIds): bool
+    {
+        if ((int) $assignment->agency_id !== $agencyId) {
+            return false;
+        }
+
+        if ($userBranchIds === []) {
+            // If user has no branch membership mapping, only allow legacy no-branch assignments.
+            return $assignment->agency_branch_id === null;
+        }
+
+        return $assignment->agency_branch_id !== null
+            && in_array((int) $assignment->agency_branch_id, $userBranchIds, true);
     }
 }

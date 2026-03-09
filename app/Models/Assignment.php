@@ -20,9 +20,11 @@ class Assignment extends Model
     protected $fillable = [
         'report_id',
         'agency_id',
+        'agency_branch_id',
         'is_primary',
         'status',
         'description',
+        'distance_km',
         'admin_verification',
         'date',
     ];
@@ -31,6 +33,7 @@ class Assignment extends Model
     {
         return [
             'is_primary' => 'boolean',
+            'distance_km' => 'decimal:3',
             'admin_verification' => 'boolean',
             'date' => 'datetime',
         ];
@@ -71,6 +74,11 @@ class Assignment extends Model
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(AgencyBranch::class, 'agency_branch_id');
     }
 
     public function steps(): HasMany

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import ImageEditorUploader from '@/Components/ImageEditorUploader';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -22,16 +23,32 @@ export default function Show({ report }) {
 
     const updateStatus = (assignmentId, status) => {
         const assignment = report.assignments?.find((item) => item.id === assignmentId);
-        if (assignment?.is_primary && status === 'rejected') {
-            const confirmed = window.confirm(
-                'Primary menolak laporan. Semua assignment secondary yang belum final akan otomatis ditolak. Lanjutkan?',
-            );
-            if (!confirmed) return;
+        let rejectType = null;
+
+        if (status === 'rejected') {
+            if (assignment?.is_primary) {
+                const choice = window.prompt(
+                    'Pilih tipe reject:\n1 = Reject Assignment saja (cari primary pengganti)\n2 = Reject Report final (secondary ikut reject)',
+                    '1',
+                );
+                if (choice === null) return;
+                if (choice.trim() === '2') {
+                    const confirmed = window.confirm(
+                        'Anda memilih Reject Report final. Semua assignment secondary yang belum final akan otomatis ditolak. Lanjutkan?',
+                    );
+                    if (!confirmed) return;
+                    rejectType = 'report_reject';
+                } else {
+                    rejectType = 'assignment_only';
+                }
+            } else {
+                rejectType = 'assignment_only';
+            }
         }
 
         router.patch(
             route('instansi.assignments.update-status', assignmentId),
-            { status },
+            { status, reject_type: rejectType },
             { preserveScroll: true },
         );
     };
@@ -168,20 +185,19 @@ export default function Show({ report }) {
                                                             onChange={(e) => setCompletionNotes((prev) => ({ ...prev, [assignment.id]: e.target.value }))}
                                                             placeholder="Jelaskan hasil tindakan instansi..."
                                                         />
-                                                        <input
-                                                            key={fileInputKeys[assignment.id] || 0}
-                                                            type="file"
-                                                            className="form-input mt-2"
-                                                            multiple
-                                                            accept="image/*"
-                                                            onChange={(e) =>
-                                                                setCompletionPhotos((prev) => ({
-                                                                    ...prev,
-                                                                    [assignment.id]: Array.from(e.target.files || []),
-                                                                }))
-                                                            }
-                                                        />
-                                                        <p className="mt-1 text-xs text-surface-500">Wajib upload minimal 1 foto bukti.</p>
+                                                        <div className="mt-2">
+                                                            <ImageEditorUploader
+                                                                resetToken={fileInputKeys[assignment.id] || 0}
+                                                                helperText="Wajib upload minimal 1 foto bukti. Bisa crop dan rotate."
+                                                                onChange={(files) =>
+                                                                    setCompletionPhotos((prev) => ({
+                                                                        ...prev,
+                                                                        [assignment.id]: files,
+                                                                    }))
+                                                                }
+                                                                errorText={errors.photos || errors['photos.0'] || ''}
+                                                            />
+                                                        </div>
                                                         {errors.completion && <p className="mt-1 text-xs text-red-500">{errors.completion}</p>}
                                                         {(errors.result_note || errors.photos || errors['photos.0']) && (
                                                             <p className="mt-1 text-xs text-red-500">

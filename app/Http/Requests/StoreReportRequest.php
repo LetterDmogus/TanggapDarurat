@@ -26,6 +26,11 @@ class StoreReportRequest extends FormRequest
             'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'metadata_text' => ['nullable', 'string'],
+            'client_reported_at' => ['nullable', 'date'],
+            'client_timezone' => ['nullable', 'string', 'max:64'],
+            'client_utc_offset_minutes' => ['nullable', 'integer', 'between:-840,840'],
+            'geo_accuracy_m' => ['nullable', 'numeric', 'min:0'],
+            'geo_source' => ['nullable', 'string', 'in:browser,manual,fallback'],
             'photos' => ['required', 'array', 'min:1', 'max:8'],
             'photos.*' => ['required', 'image', 'max:5120'],
         ];

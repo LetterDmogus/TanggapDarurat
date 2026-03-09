@@ -22,13 +22,13 @@ class Agency extends Model
         return $this->hasMany(User::class);
     }
 
-    public function locations()
-    {
-        return $this->hasMany(Location::class);
-    }
-
     public function routingRules()
     {
         return $this->hasMany(RoutingRule::class);
+    }
+
+    public function branches()
+    {
+        return $this->hasMany(AgencyBranch::class);
     }
 }

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Agency;
 use App\Models\EmergencyType;
-use App\Models\Location;
 use App\Models\RoutingRule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +21,6 @@ class AdminMasterDataTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.agencies.index'))->assertOk();
         $this->actingAs($admin)->get(route('admin.emergency-types.index'))->assertOk();
-        $this->actingAs($admin)->get(route('admin.locations.index'))->assertOk();
         $this->actingAs($admin)->get(route('admin.routing-rules.index'))->assertOk();
         $this->actingAs($admin)->get(route('admin.users.index'))->assertOk();
     }
@@ -35,7 +33,6 @@ class AdminMasterDataTest extends TestCase
 
         $this->actingAs($pelapor)->get(route('admin.agencies.index'))->assertForbidden();
         $this->actingAs($pelapor)->get(route('admin.emergency-types.index'))->assertForbidden();
-        $this->actingAs($pelapor)->get(route('admin.locations.index'))->assertForbidden();
         $this->actingAs($pelapor)->get(route('admin.routing-rules.index'))->assertForbidden();
         $this->actingAs($pelapor)->get(route('admin.users.index'))->assertForbidden();
     }
@@ -48,19 +45,16 @@ class AdminMasterDataTest extends TestCase
 
         $this->actingAs($superadmin)->get(route('admin.agencies.index', ['trashed' => 'true']))->assertOk();
         $this->actingAs($superadmin)->get(route('admin.emergency-types.index', ['trashed' => 'true']))->assertOk();
-        $this->actingAs($superadmin)->get(route('admin.locations.index', ['trashed' => 'true']))->assertOk();
         $this->actingAs($superadmin)->get(route('admin.routing-rules.index', ['trashed' => 'true']))->assertOk();
         $this->actingAs($superadmin)->get(route('admin.users.index', ['trashed' => 'true']))->assertOk();
 
         $this->actingAs($admin)->get(route('admin.agencies.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($admin)->get(route('admin.emergency-types.index', ['trashed' => 'true']))->assertForbidden();
-        $this->actingAs($admin)->get(route('admin.locations.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($admin)->get(route('admin.routing-rules.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($admin)->get(route('admin.users.index', ['trashed' => 'true']))->assertForbidden();
 
         $this->actingAs($manager)->get(route('admin.agencies.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.emergency-types.index', ['trashed' => 'true']))->assertForbidden();
-        $this->actingAs($manager)->get(route('admin.locations.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.routing-rules.index', ['trashed' => 'true']))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.users.index', ['trashed' => 'true']))->assertForbidden();
     }
@@ -96,20 +90,6 @@ class AdminMasterDataTest extends TestCase
         $this->assertNotNull($emergencyType);
         $this->assertDatabaseHas('emergency_types', ['name' => 'kebakaran']);
 
-        $this->actingAs($admin)->post(route('admin.locations.store'), [
-            'name' => 'Pos 1',
-            'location_type' => 'station',
-            'longitude' => 106.8166667,
-            'latitude' => -6.2,
-            'agency_id' => $agency->id,
-            'metadata_text' => '{"zone":"A"}',
-        ])->assertRedirect();
-
-        $location = Location::first();
-
-        $this->assertNotNull($location);
-        $this->assertDatabaseHas('locations', ['name' => 'Pos 1']);
-
         $this->actingAs($admin)->post(route('admin.routing-rules.store'), [
             'emergency_type_id' => $emergencyType->id,
             'agency_id' => $agency->id,
@@ -143,6 +123,7 @@ class AdminMasterDataTest extends TestCase
     public function test_soft_delete_restore_and_force_delete_work_for_agencies(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
+        $superadmin = User::factory()->create(['role' => 'superadmin']);
         $agency = Agency::create([
             'name' => 'BPBD',
             'type' => 'disaster',
@@ -153,11 +134,11 @@ class AdminMasterDataTest extends TestCase
         $this->actingAs($admin)->delete(route('admin.agencies.destroy', $agency->id))->assertRedirect();
         $this->assertSoftDeleted('agencies', ['id' => $agency->id]);
 
-        $this->actingAs($admin)->post(route('admin.agencies.restore', $agency->id))->assertRedirect();
+        $this->actingAs($superadmin)->post(route('admin.agencies.restore', $agency->id))->assertRedirect();
         $this->assertDatabaseHas('agencies', ['id' => $agency->id, 'deleted_at' => null]);
 
         $this->actingAs($admin)->delete(route('admin.agencies.destroy', $agency->id))->assertRedirect();
-        $this->actingAs($admin)->delete(route('admin.agencies.force-delete', $agency->id))->assertRedirect();
+        $this->actingAs($superadmin)->delete(route('admin.agencies.force-delete', $agency->id))->assertRedirect();
         $this->assertDatabaseMissing('agencies', ['id' => $agency->id]);
     }
 }

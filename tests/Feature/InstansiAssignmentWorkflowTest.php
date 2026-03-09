@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Agency;
+use App\Models\AgencyBranch;
 use App\Models\Assignment;
 use App\Models\EmergencyType;
 use App\Models\Report;
@@ -10,6 +11,7 @@ use App\Models\Step;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -366,6 +368,87 @@ class InstansiAssignmentWorkflowTest extends TestCase
         $this->assertDatabaseHas('reports', [
             'id' => $report->id,
             'status' => 'rejected',
+        ]);
+    }
+
+    public function test_primary_reject_assignment_only_moves_to_other_branch_in_same_agency(): void
+    {
+        $agencyPrimary = Agency::create(['name' => 'Primary Reject Assignment Only']);
+        $instansiPrimary = User::factory()->create(['role' => 'instansi', 'agency_id' => $agencyPrimary->id]);
+        $pelapor = User::factory()->create(['role' => 'pelapor']);
+        $type = EmergencyType::create(['name' => 'reject_assignment_only_case', 'display_name' => 'Reject Assignment Only Case', 'is_need_location' => false]);
+
+        $branchA = AgencyBranch::create([
+            'agency_id' => $agencyPrimary->id,
+            'name' => 'Primary Branch A',
+            'latitude' => 1.1300000,
+            'longitude' => 104.0500000,
+            'is_active' => true,
+        ]);
+        $branchB = AgencyBranch::create([
+            'agency_id' => $agencyPrimary->id,
+            'name' => 'Primary Branch B',
+            'latitude' => 1.1310000,
+            'longitude' => 104.0510000,
+            'is_active' => true,
+        ]);
+
+        $report = Report::create([
+            'emergency_type_id' => $type->id,
+            'user_id' => $pelapor->id,
+            'status' => 'assigned',
+            'description' => 'Primary reject assignment only case',
+            'latitude' => 1.1309000,
+            'longitude' => 104.0509000,
+            'metadata' => [],
+            'metadata_schema_version' => 1,
+        ]);
+
+        $primary = Assignment::create([
+            'report_id' => $report->id,
+            'agency_id' => $agencyPrimary->id,
+            'agency_branch_id' => $branchA->id,
+            'is_primary' => true,
+            'status' => Assignment::STATUS_PENDING,
+        ]);
+
+        DB::table('agency_branch_user')->insert([
+            'agency_branch_id' => $branchA->id,
+            'user_id' => $instansiPrimary->id,
+            'is_primary_branch' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($instansiPrimary)
+            ->patch(route('instansi.assignments.update-status', $primary), [
+                'status' => Assignment::STATUS_REJECTED,
+                'reject_type' => 'assignment_only',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('assignments', [
+            'id' => $primary->id,
+            'status' => Assignment::STATUS_REJECTED,
+            'is_primary' => false,
+        ]);
+
+        $fallback = Assignment::query()
+            ->where('report_id', $report->id)
+            ->where('id', '!=', $primary->id)
+            ->first();
+
+        $this->assertNotNull($fallback);
+        $this->assertDatabaseHas('assignments', [
+            'id' => $fallback->id,
+            'agency_id' => $agencyPrimary->id,
+            'agency_branch_id' => $branchB->id,
+            'status' => Assignment::STATUS_PENDING,
+            'is_primary' => true,
+        ]);
+        $this->assertDatabaseHas('reports', [
+            'id' => $report->id,
+            'status' => 'assigned',
         ]);
     }
 

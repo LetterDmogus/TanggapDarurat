@@ -14,7 +14,6 @@ class Report extends Model
     protected $fillable = [
         'emergency_type_id',
         'user_id',
-        'location_id',
         'status',
         'is_other_emergency',
         'description',
@@ -26,6 +25,12 @@ class Report extends Model
         'metadata',
         'metadata_schema_version',
         'date',
+        'client_reported_at',
+        'client_timezone',
+        'client_utc_offset_minutes',
+        'geo_accuracy_m',
+        'geo_source',
+        'server_received_at',
     ];
 
     protected function casts(): array
@@ -36,6 +41,10 @@ class Report extends Model
             'metadata_schema_version' => 'integer',
             'date' => 'datetime',
             'triaged_at' => 'datetime',
+            'client_reported_at' => 'datetime',
+            'client_utc_offset_minutes' => 'integer',
+            'geo_accuracy_m' => 'decimal:2',
+            'server_received_at' => 'datetime',
         ];
     }
 
@@ -47,11 +56,6 @@ class Report extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(Location::class);
     }
 
     public function photos(): HasMany

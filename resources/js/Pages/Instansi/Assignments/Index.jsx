@@ -1,10 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import Pagination from '@/Components/Admin/Pagination';
+import ImageEditorUploader from '@/Components/ImageEditorUploader';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Index({ items, filters, statuses, emergency_types: emergencyTypes = [] }) {
+export default function Index({ items, filters, statuses, emergency_types: emergencyTypes = [], scope = 'branch' }) {
     const { errors } = usePage().props;
     const [notes, setNotes] = useState({});
     const [completionNotes, setCompletionNotes] = useState({});
@@ -13,8 +14,9 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
     const [searchText, setSearchText] = useState(filters.q || '');
 
     const applyFilters = (nextFilters) => {
+        const routeName = scope === 'agency' ? 'instansi.assignments.index-agency' : 'instansi.assignments.index';
         router.get(
-            route('instansi.assignments.index'),
+            route(routeName),
             {
                 status: nextFilters.status || undefined,
                 q: nextFilters.q || undefined,
@@ -26,16 +28,32 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
 
     const updateStatus = (assignmentId, status) => {
         const assignment = items.data.find((item) => item.id === assignmentId);
-        if (assignment?.is_primary && status === 'rejected') {
-            const confirmed = window.confirm(
-                'Primary menolak laporan. Semua assignment secondary yang belum final akan otomatis ditolak. Lanjutkan?',
-            );
-            if (!confirmed) return;
+        let rejectType = null;
+
+        if (status === 'rejected') {
+            if (assignment?.is_primary) {
+                const choice = window.prompt(
+                    'Pilih tipe reject:\n1 = Reject Assignment saja (cari primary pengganti)\n2 = Reject Report final (secondary ikut reject)',
+                    '1',
+                );
+                if (choice === null) return;
+                if (choice.trim() === '2') {
+                    const confirmed = window.confirm(
+                        'Anda memilih Reject Report final. Semua assignment secondary yang belum final akan otomatis ditolak. Lanjutkan?',
+                    );
+                    if (!confirmed) return;
+                    rejectType = 'report_reject';
+                } else {
+                    rejectType = 'assignment_only';
+                }
+            } else {
+                rejectType = 'assignment_only';
+            }
         }
 
         router.patch(
             route('instansi.assignments.update-status', assignmentId),
-            { status },
+            { status, reject_type: rejectType },
             { preserveScroll: true },
         );
     };
@@ -110,6 +128,23 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
 
             <div className="min-h-[calc(100vh-9rem)] w-full bg-gradient-to-b from-red-700 via-red-600 to-red-700 py-8">
                 <div className="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
+                    <div className="rounded-2xl border border-red-100 bg-white p-2 shadow">
+                        <div className="inline-flex rounded-xl border border-surface-200 bg-surface-50 p-1">
+                            <Link
+                                href={route('instansi.assignments.index')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${scope === 'branch' ? 'bg-red-600 text-white' : 'text-surface-600'}`}
+                            >
+                                Cabang Saya
+                            </Link>
+                            <Link
+                                href={route('instansi.assignments.index-agency')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${scope === 'agency' ? 'bg-red-600 text-white' : 'text-surface-600'}`}
+                            >
+                                Semua Cabang
+                            </Link>
+                        </div>
+                    </div>
+
                     <div className="rounded-2xl border border-red-100 bg-white p-4 shadow">
                         <div className="grid gap-3 md:grid-cols-4">
                             <div>
@@ -194,6 +229,9 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
                                             <p className="text-xs text-surface-500">
                                                 Pelapor: {assignment.report?.pelapor?.name || '-'} | Instansi: {assignment.agency?.name || '-'}
                                             </p>
+                                            <p className="text-xs text-surface-500">
+                                                Cabang: {assignment.branch?.name || '-'} {assignment.distance_km ? `| Jarak: ${Number(assignment.distance_km).toFixed(2)} km` : ''}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {assignment.is_primary ? (
@@ -219,23 +257,27 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
                                     </div>
 
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        {assignment.available_transitions?.length ? (
-                                            assignment.available_transitions.map((nextStatus) => (
-                                                <button
-                                                    key={nextStatus}
-                                                    type="button"
-                                                    onClick={() => updateStatus(assignment.id, nextStatus)}
-                                                    className={getTransitionButtonClass(nextStatus)}
-                                                >
-                                                    Set {nextStatus}
-                                                </button>
-                                            ))
+                                        {assignment.can_manage ? (
+                                            assignment.available_transitions?.length ? (
+                                                assignment.available_transitions.map((nextStatus) => (
+                                                    <button
+                                                        key={nextStatus}
+                                                        type="button"
+                                                        onClick={() => updateStatus(assignment.id, nextStatus)}
+                                                        className={getTransitionButtonClass(nextStatus)}
+                                                    >
+                                                        Set {nextStatus}
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-surface-500">Status sudah final.</p>
+                                            )
                                         ) : (
-                                            <p className="text-xs text-surface-500">Status sudah final.</p>
+                                            <p className="text-xs text-surface-500">Readonly: assignment ini milik cabang lain.</p>
                                         )}
                                     </div>
 
-                                    {assignment.can_submit_completion && (
+                                    {assignment.can_manage && assignment.can_submit_completion && (
                                         <div className="mt-4 rounded-lg border border-surface-200 bg-surface-50 p-3">
                                             <p className="text-xs font-semibold uppercase tracking-wider text-surface-500">Submit Hasil Penanganan</p>
                                             <textarea
@@ -244,20 +286,19 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
                                                 onChange={(e) => setCompletionNotes((prev) => ({ ...prev, [assignment.id]: e.target.value }))}
                                                 placeholder="Jelaskan hasil tindakan instansi..."
                                             />
-                                            <input
-                                                key={fileInputKeys[assignment.id] || 0}
-                                                type="file"
-                                                className="form-input mt-2"
-                                                multiple
-                                                accept="image/*"
-                                                onChange={(e) =>
-                                                    setCompletionPhotos((prev) => ({
-                                                        ...prev,
-                                                        [assignment.id]: Array.from(e.target.files || []),
-                                                    }))
-                                                }
-                                            />
-                                            <p className="mt-1 text-xs text-surface-500">Wajib upload minimal 1 foto bukti.</p>
+                                            <div className="mt-2">
+                                                <ImageEditorUploader
+                                                    resetToken={fileInputKeys[assignment.id] || 0}
+                                                    helperText="Wajib upload minimal 1 foto bukti. Bisa crop dan rotate."
+                                                    onChange={(files) =>
+                                                        setCompletionPhotos((prev) => ({
+                                                            ...prev,
+                                                            [assignment.id]: files,
+                                                        }))
+                                                    }
+                                                    errorText={errors.photos || errors['photos.0'] || ''}
+                                                />
+                                            </div>
                                             {errors.completion && <p className="mt-1 text-xs text-red-500">{errors.completion}</p>}
                                             {(errors.result_note || errors.photos || errors['photos.0']) && (
                                                 <p className="mt-1 text-xs text-red-500">
@@ -274,24 +315,26 @@ export default function Index({ items, filters, statuses, emergency_types: emerg
                                         </div>
                                     )}
 
-                                    <div className="mt-4 border-t border-surface-200 pt-3">
-                                        <label className="form-label">Catatan Tahapan</label>
-                                        <div className="flex flex-col sm:flex-row gap-2">
-                                            <input
-                                                className="form-input"
-                                                value={notes[assignment.id] || ''}
-                                                onChange={(e) => setNotes((prev) => ({ ...prev, [assignment.id]: e.target.value }))}
-                                                placeholder="Tulis catatan proses dari instansi..."
-                                            />
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                                                onClick={() => addStep(assignment.id)}
-                                            >
-                                                Simpan Catatan
-                                            </button>
+                                    {assignment.can_manage && (
+                                        <div className="mt-4 border-t border-surface-200 pt-3">
+                                            <label className="form-label">Catatan Tahapan</label>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input
+                                                    className="form-input"
+                                                    value={notes[assignment.id] || ''}
+                                                    onChange={(e) => setNotes((prev) => ({ ...prev, [assignment.id]: e.target.value }))}
+                                                    placeholder="Tulis catatan proses dari instansi..."
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                                                    onClick={() => addStep(assignment.id)}
+                                                >
+                                                    Simpan Catatan
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

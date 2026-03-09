@@ -5,7 +5,6 @@ import {
     LayoutDashboard,
     Building2,
     ShieldAlert,
-    MapPinned,
     Route as RouteIcon,
     Users,
     ClipboardList,
@@ -54,8 +53,8 @@ export default function AdminLayout({ header, children }) {
     const navigation = [
         { name: 'Dashboard', href: route('admin.dashboard'), icon: LayoutDashboard, active: route().current('admin.dashboard') },
         { name: 'Agencies', href: route('admin.agencies.index'), icon: Building2, active: route().current('admin.agencies.*') },
+        { name: 'Agency Branches', href: route('admin.agency-branches.index'), icon: Building2, active: route().current('admin.agency-branches.*') },
         { name: 'Emergency Types', href: route('admin.emergency-types.index'), icon: ShieldAlert, active: route().current('admin.emergency-types.*') },
-        { name: 'Locations', href: route('admin.locations.index'), icon: MapPinned, active: route().current('admin.locations.*') },
         { name: 'Routing Rules', href: route('admin.routing-rules.index'), icon: RouteIcon, active: route().current('admin.routing-rules.*') },
         { name: 'Users', href: route('admin.users.index'), icon: Users, active: route().current('admin.users.*') },
         { name: 'Reports', href: route('admin.reports.index'), icon: ClipboardList, active: route().current('admin.reports.*') },
